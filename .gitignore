@@ -1,0 +1,5 @@
+.venv/
+audio/
+.python-version
+.DS_Store
+uv.lock
