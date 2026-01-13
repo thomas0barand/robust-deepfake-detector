@@ -5,3 +5,4 @@ torchaudio
 torch
 matplotlib
 encodec
+numpy<2
