@@ -16,8 +16,8 @@ import soxr
 from scipy import interpolate
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--save", help="save file", type=str, default="")
-parser.add_argument("--path", help="audio files dir", type=str)
+parser.add_argument("--save", help="save file", type=str, default="outputs/fp/fp_sonics_part_01.npy")
+parser.add_argument("--path", help="audio files dir", type=str, default="data/sonics/part_01")
 parser.add_argument("--sr", help="audio sampling rate", type=int, default=44100)
 parser.add_argument("--fmin", help="low freq cutoff (in Hz)", type=int, default=5000)
 parser.add_argument("--fmax", help="high freq cutoff (in Hz)", type=int, default=16000)

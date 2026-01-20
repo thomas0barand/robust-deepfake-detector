@@ -11,8 +11,8 @@ from sklearn.linear_model import LogisticRegression
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--synth", help="synth dataset link", type=str, default="")
-parser.add_argument("--real", help="real dataset link", type=str)
+parser.add_argument("--synth", help="synth dataset link", type=str, default="outputs/fp/fp_ai.npy")
+parser.add_argument("--real", help="real dataset link", type=str, default="outputs/fp/fp_human.npy")
 args = parser.parse_args()
 
 synth_db = np.load(args.synth, allow_pickle=True).item()
@@ -52,3 +52,4 @@ print("Real class test acc: {:.3f}%, false positive: {:.3f}%".format(real_acc_sc
 print("Synth class test acc: {:.3f}%, false negative: {:.3f}%".format(synth_acc_score * 100, (1-synth_acc_score) * 100  ) )
 
 weights = {"W": reg.coef_, "B": reg.intercept_}  # save me
+np.save("outputs/models/weights.npy", weights)
