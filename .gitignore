@@ -8,3 +8,5 @@ attack/*
 data/*
 !data/ai
 !data/human
+
+.idea
