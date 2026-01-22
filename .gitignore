@@ -1,4 +1,10 @@
 .venv/
 .DS_Store
 
+**/_pycache_/
 
+data/*
+!data/ai
+!data/human
+
+.idea
