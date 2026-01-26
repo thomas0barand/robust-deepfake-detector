@@ -27,7 +27,7 @@ N_FFT = 1 << 14
 ##
 
 def open_audio_slice(f_path):
-    audio_raw, sr = torchaudio.load( f_path, channels_first = False)
+    audio_raw, sr = torchaudio.load(f_path, channels_first = False)
     audio_raw = audio_raw.numpy()
     return audio_raw, sr
 

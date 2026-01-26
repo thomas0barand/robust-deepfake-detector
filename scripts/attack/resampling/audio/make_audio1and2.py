@@ -9,22 +9,20 @@ SAMPLE_RATE = 44100
 FIGURES_OUT = "outputs/figures/signals/"
 AUDIO_OUT = "data/signals/"
 
+os.makedirs(AUDIO_OUT, exist_ok=True)
 t = np.linspace(0, DURATION, DURATION * SAMPLE_RATE, endpoint=False)
 
-# Signal 1: Clean harmonics (fundamental + overtones)
-fundamental = 220  # A3
-signal1 = (
-    0.5 * np.sin(2 * np.pi * fundamental * t) +          # fundamental
-    0.3 * np.sin(2 * np.pi * 2 * fundamental * t) +      # 2nd harmonic (440 Hz)
-    0.2 * np.sin(2 * np.pi * 3 * fundamental * t) +      # 3rd harmonic (660 Hz)
-    0.15 * np.sin(2 * np.pi * 4 * fundamental * t) +     # 4th harmonic (880 Hz)
-    0.1 * np.sin(2 * np.pi * 5 * fundamental * t)        # 5th harmonic (1100 Hz)
-)
+# Signal 1: Clean frequencies
+frequencies = [6000, 10000, 15000]  # Hz
+amplitudes = [0.5, 0.4, 0.3]
+signal1 = np.zeros_like(t)
+for freq, amp in zip(frequencies, amplitudes):
+    signal1 += amp * np.sin(2 * np.pi * freq * t)
 signal1 = signal1 / np.max(np.abs(signal1))  # normalize
 
 # Signal 2: Narrow triangular peaks in FFT + visible noise floor
-frequencies = [150, 400, 750, 1200, 2000]  # Hz - center of peaks
-amplitudes = [0.4, 0.35, 0.3, 0.25, 0.2]
+frequencies = [6000, 10000, 15000]  # Hz - center of peaks
+amplitudes = [0.4, 0.35, 0.3]
 peak_width = 15  # Hz - controls the width of the triangular peaks
 
 signal2 = np.zeros_like(t)
@@ -63,14 +61,14 @@ fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 # Signal 1 waveform (first 50ms)
 samples_to_show = int(0.05 * SAMPLE_RATE)
 axes[0, 0].plot(t[:samples_to_show] * 1000, signal1[:samples_to_show], color='steelblue', linewidth=0.5)
-axes[0, 0].set_title("Signal 1: Harmonic Series")
+axes[0, 0].set_title("Signal 1: Clean Frequencies")
 axes[0, 0].set_xlabel("Time (ms)")
 axes[0, 0].set_ylabel("Amplitude")
 axes[0, 0].grid(True, alpha=0.3)
 
 # Signal 1 FFT
 axes[0, 1].plot(freq_axis, fft1, color='steelblue', linewidth=0.8)
-axes[0, 1].set_title(f"Signal 1 FFT: Harmonics @ {fundamental}, {2*fundamental}, {3*fundamental}, {4*fundamental}, {5*fundamental} Hz")
+axes[0, 1].set_title(f"Signal 1 FFT: peaks @ {frequencies} Hz")
 axes[0, 1].set_xlabel("Frequency (Hz)")
 axes[0, 1].set_ylabel("Magnitude")
 axes[0, 1].set_xlim(0, 3000)
