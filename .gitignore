@@ -3,9 +3,6 @@
 
 **/_pycache_/
 
-data/*
-!data/ai
-!data/human
 
 data/ai/sonics
 data/human/fma_small
