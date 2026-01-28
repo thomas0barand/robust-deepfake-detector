@@ -12,13 +12,12 @@ AUDIO_OUT = "data/signals/"
 t = np.linspace(0, DURATION, DURATION * SAMPLE_RATE, endpoint=False)
 
 # Signal 1: Clean harmonics (fundamental + overtones)
-fundamental = 220  # A3
-signal1 = (
-    0.5 * np.sin(2 * np.pi * fundamental * t) +          # fundamental
-    0.3 * np.sin(2 * np.pi * 2 * fundamental * t) +      # 2nd harmonic (440 Hz)
-    0.2 * np.sin(2 * np.pi * 3 * fundamental * t) +      # 3rd harmonic (660 Hz)
-    0.15 * np.sin(2 * np.pi * 4 * fundamental * t) +     # 4th harmonic (880 Hz)
-    0.1 * np.sin(2 * np.pi * 5 * fundamental * t)        # 5th harmonic (1100 Hz)
+fundamental = 500  
+harmonic_multipliers = [1, 3, 12, 16, 20]
+harmonic_amplitudes = [0.5, 0.3, 0.2, 0.15, 0.1]
+signal1 = sum(
+    amp * np.sin(2 * np.pi * mult * fundamental * t)
+    for mult, amp in zip(harmonic_multipliers, harmonic_amplitudes)
 )
 signal1 = signal1 / np.max(np.abs(signal1))  # normalize
 
@@ -47,8 +46,8 @@ signal2 = signal2 / np.max(np.abs(signal2))  # normalize
 signal1_int = np.int16(signal1 * 32767)
 signal2_int = np.int16(signal2 * 32767)
 
-wavfile.write(os.path.join(AUDIO_OUT, "signal1_harmonics.wav"), SAMPLE_RATE, signal1_int)
-wavfile.write(os.path.join(AUDIO_OUT, "signal2_spikes_noise.wav"), SAMPLE_RATE, signal2_int)
+wavfile.write(os.path.join(AUDIO_OUT, "signal1.wav"), SAMPLE_RATE, signal1_int)
+wavfile.write(os.path.join(AUDIO_OUT, "signal2.wav"), SAMPLE_RATE, signal2_int)
 
 # Compute FFTs
 n = len(t)
@@ -69,11 +68,13 @@ axes[0, 0].set_ylabel("Amplitude")
 axes[0, 0].grid(True, alpha=0.3)
 
 # Signal 1 FFT
+signal1_freqs = [mult * fundamental for mult in harmonic_multipliers]
+max_freq_signal1 = max(signal1_freqs) * 1.1  # 10% padding
 axes[0, 1].plot(freq_axis, fft1, color='steelblue', linewidth=0.8)
-axes[0, 1].set_title(f"Signal 1 FFT: Harmonics @ {fundamental}, {2*fundamental}, {3*fundamental}, {4*fundamental}, {5*fundamental} Hz")
+axes[0, 1].set_title(f"Signal 1 FFT: Harmonics @ {signal1_freqs} Hz")
 axes[0, 1].set_xlabel("Frequency (Hz)")
 axes[0, 1].set_ylabel("Magnitude")
-axes[0, 1].set_xlim(0, 3000)
+axes[0, 1].set_xlim(0, max_freq_signal1)
 axes[0, 1].grid(True, alpha=0.3)
 
 # Signal 2 waveform (first 50ms)
@@ -92,5 +93,4 @@ axes[1, 1].set_xlim(0, 3000)
 axes[1, 1].grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig(os.path.join(FIGURES_OUT, "fft for signals 1 and 2"), dpi=150)
-plt.close()
+plt.show()
