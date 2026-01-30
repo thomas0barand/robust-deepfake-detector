@@ -2,7 +2,7 @@
 Compare fakeprints of two audio files.
 
 Usage:
-    python scripts/attack/fakeprints_comparaison.py data/ai/fake_00001_suno_0.mp3 data/signals/resampled/fake_00001_suno_0_rs.mp3 
+    python scripts/attack/soxr/visualise/fakeprints.py data/ai/fake_00001_suno_0.mp3 data/signals/resampled/fake_00001_suno_0_rs.mp3 
 """
 
 import sys

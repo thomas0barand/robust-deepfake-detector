@@ -1,5 +1,5 @@
 """
-python scripts/attack/compute_fft_improved.py -og data/ai/fake_00001_suno_0.mp3 -nw data/signals/resampled/fake_00001_suno_0_rs.mp3           
+python scripts/attack/soxr/visualise/fft_improved.py -og data/ai/fake_00001_suno_0.mp3 -nw data/signals/resampled/fake_00001_suno_0_rs.mp3           
 """
 import argparse
 import numpy as np

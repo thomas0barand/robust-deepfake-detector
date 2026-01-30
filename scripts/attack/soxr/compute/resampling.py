@@ -3,7 +3,7 @@
 Resample audio to new sample rate
 
 Run:
-python scripts/attack/resampling/resampling.py data/signals/signal1.wav --sr 16000 -n signal1_rs.wav
+python scripts/attack/soxr/compute/resampling.py data/signals/signal1.wav --sr 16000 -n signal1_rs.wav
 """
 
 import argparse

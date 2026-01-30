@@ -1,5 +1,5 @@
 """
-python scripts/attack/compute_fft.py -og data/signals/signal1.wav -nw data/signals/signal1_rs.wav
+python scripts/attack/soxr/visualise/fft.py -og data/signals/signal1.wav -nw data/signals/signal1_rs.wav
 """
 
 """
@@ -65,7 +65,7 @@ def plot_fft_comparison(original_path, new_path):
     ax2.set_ylim(bottom=np.max(mag2) - 100)
     ax2.grid(True, alpha=0.3)
     
-    ax2.set_xlim(0, 8000)
+    ax2.set_xlim(0, 25000)
     
     plt.tight_layout()
     plt.show()

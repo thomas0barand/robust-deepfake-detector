@@ -14,7 +14,7 @@ t = np.linspace(0, DURATION, DURATION * SAMPLE_RATE, endpoint=False)
 # Signal 1: Clean harmonics (fundamental + overtones)
 fundamental = 500  
 harmonic_multipliers = [1, 3, 12, 16, 20]
-harmonic_amplitudes = [0.5, 0.3, 0.2, 0.15, 0.1]
+harmonic_amplitudes = [0.5, 0.3, 0.2, 0.15, 0.01]
 signal1 = sum(
     amp * np.sin(2 * np.pi * mult * fundamental * t)
     for mult, amp in zip(harmonic_multipliers, harmonic_amplitudes)
