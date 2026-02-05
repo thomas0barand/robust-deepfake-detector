@@ -5,6 +5,9 @@ attack/*
 
 **/__pycache__/
 
+logs/
+lightning_logs/
+
 # Large files
 *.mp3
 *.csv
