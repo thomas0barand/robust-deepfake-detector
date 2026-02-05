@@ -4,7 +4,7 @@ import librosa
 import numpy as np
 from scipy import interpolate
 
-
+F_MIN = 32.7
 
 def get_stft(waveform, n_fft, hop_length):
     if waveform.ndim == 1:
@@ -55,7 +55,6 @@ def lower_hull(x, area=10):
 def get_fakeprint(
     spectrum,
     sr,
-    f_min=27.5,
     bins_per_octave=96,
     f_range=[5000, 16000],
     mode="stft",
@@ -69,7 +68,7 @@ def get_fakeprint(
 
     if mode == "cqt":
         bin_indices = np.arange(len(fp))
-        x_real = f_min * (2 ** (bin_indices / bins_per_octave))
+        x_real = F_MIN * (2 ** (bin_indices / bins_per_octave))
     else:
         x_real = np.linspace(0, sr / 2, num=len(fp))
 
