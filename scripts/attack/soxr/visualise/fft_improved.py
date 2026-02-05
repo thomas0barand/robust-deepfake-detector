@@ -1,5 +1,5 @@
 """
-python scripts/attack/soxr/visualise/fft_improved.py -og data/ai/fake_00001_suno_0.mp3 -nw data/signals/resampled/fake_00001_suno_0_rs.mp3           
+python scripts/attack/soxr/visualise/fft_improved.py -og data/signals/originals/signal2.mp3 -nw data/signals/spedup/signal2_s.mp3           
 """
 import argparse
 import numpy as np
@@ -32,7 +32,7 @@ def plot_fft_comparison(original_path, new_path):
     sr2, audio2 = read_audio(new_path)
     
     print(f"Original: SR={sr1}, samples={len(audio1)}")
-    print(f"Resampled: SR={sr2}, samples={len(audio2)}")
+    print(f"modified: SR={sr2}, samples={len(audio2)}")
     
     # Convert to mono if stereo
     if audio1.ndim > 1:
@@ -81,7 +81,7 @@ def plot_fft_comparison(original_path, new_path):
     # 1. Overlay comparison (smoothed)
     ax1 = fig.add_subplot(3, 2, 1)
     ax1.plot(common_freqs, mag1_smooth, 'b-', alpha=0.7, linewidth=1, label='Original')
-    ax1.plot(common_freqs, mag2_smooth, 'r-', alpha=0.7, linewidth=1, label='Resampled')
+    ax1.plot(common_freqs, mag2_smooth, 'r-', alpha=0.7, linewidth=1, label='modified')
     ax1.set_ylabel('Magnitude (dB)')
     ax1.set_title('Smoothed Spectra Overlay')
     ax1.legend()
@@ -91,12 +91,12 @@ def plot_fft_comparison(original_path, new_path):
     # 2. Difference plot (smoothed)
     ax2 = fig.add_subplot(3, 2, 2)
     ax2.fill_between(common_freqs, diff_smooth, 0, 
-                     where=(diff_smooth > 0), color='green', alpha=0.5, label='Resampled > Original')
+                     where=(diff_smooth > 0), color='green', alpha=0.5, label='modified > Original')
     ax2.fill_between(common_freqs, diff_smooth, 0,
-                     where=(diff_smooth < 0), color='red', alpha=0.5, label='Resampled < Original')
+                     where=(diff_smooth < 0), color='red', alpha=0.5, label='modified < Original')
     ax2.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
     ax2.set_ylabel('Difference (dB)')
-    ax2.set_title('Smoothed Difference (Resampled - Original)')
+    ax2.set_title('Smoothed Difference (modified - Original)')
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     ax2.set_xlim(0, 8000)
@@ -109,7 +109,7 @@ def plot_fft_comparison(original_path, new_path):
                     extent=[0, max_freq, 0, 1],
                     cmap='RdBu_r', vmin=-10, vmax=10)
     ax3.set_xlabel('Frequency (Hz)')
-    ax3.set_title('Difference Heatmap (Blue=Original louder, Red=Resampled louder)')
+    ax3.set_title('Difference Heatmap (Blue=Original louder, Red=modified louder)')
     ax3.set_yticks([])
     plt.colorbar(im, ax=ax3, label='dB difference')
     

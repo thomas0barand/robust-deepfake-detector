@@ -1,5 +1,5 @@
 """
-python scripts/attack/soxr/visualise/fft.py -og data/signals/signal1.wav -nw data/signals/signal1_rs.wav
+python scripts/attack/soxr/visualise/fft.py -og data/signals/originals/signal1.mp3 -nw data/signals/resampled/signal1_rs.mp3
 """
 
 """
@@ -51,17 +51,17 @@ def plot_fft_comparison(original_path, new_path):
     
     # Plot
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
-    
+    fig.suptitle("Original (44.1kHz) vs Sped up (x1.2) FFT comparaison")
     ax1.plot(freqs1, mag1, linewidth=0.5)
     ax1.set_ylabel('Magnitude (dB)')
-    ax1.set_title('Original (with Hann window)')
+    ax1.set_title('Original')
     ax1.set_ylim(bottom=np.max(mag1) - 100)
     ax1.grid(True, alpha=0.3)
     
     ax2.plot(freqs2, mag2, linewidth=0.5)
     ax2.set_ylabel('Magnitude (dB)')
     ax2.set_xlabel('Frequency (Hz)')
-    ax2.set_title('Resampled (with Hann window)')
+    ax2.set_title('Resampled')
     ax2.set_ylim(bottom=np.max(mag2) - 100)
     ax2.grid(True, alpha=0.3)
     

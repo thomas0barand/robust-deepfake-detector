@@ -1,8 +1,8 @@
 """
-Compare fakeprints of two audio files.
+Compare spectra of two audio files in log-frequency space.
 
 Usage:
-    python scripts/attack/soxr/visualise/fakeprints.py data/signals/originals/signal1.mp3 data/signals/resampled/signal1_rs.mp3 
+    python scripts/attack/soxr/visualise/fakeprints_log.py data/signals/originals/signal1.mp3 data/signals/spedup/signal1_s.mp3
 """
 
 import sys
@@ -10,21 +10,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torchaudio
-import soxr
 from scipy import interpolate
 
 N_FFT = 1 << 14
 
-
 def load_audio(filepath, target_sr=44100):
     audio, sr = torchaudio.load(filepath)
     audio = audio.mean(dim=0).numpy()
-    if sr != target_sr:
-        audio = soxr.resample(audio, sr, target_sr)
-    return audio, target_sr
+    return audio, sr
 
 
-def compute_fakeprint(audio, sr, f_range=(5000, 16000)):
+def compute_fakeprint(audio, sr, f_range=(100, 20000)):
     # Step 1: Average spectrum
     spec = torchaudio.transforms.Spectrogram(n_fft=N_FFT, power=2)(torch.Tensor(audio))
     spectrum = 10 * np.log10(np.clip(spec.mean(dim=1).numpy(), 1e-10, None))
@@ -54,7 +50,7 @@ def compute_fakeprint(audio, sr, f_range=(5000, 16000)):
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("Usage: python compare_fakeprints.py <audio1> <audio2>")
+        print("Usage: python compare_fakeprints_log.py <audio1> <audio2>")
         sys.exit(1)
     
     audio1, sr = load_audio(sys.argv[1])
@@ -64,11 +60,11 @@ if __name__ == "__main__":
     freqs2, fp2 = compute_fakeprint(audio2, sr)
     
     plt.figure(figsize=(12, 5))
-    plt.plot(freqs1 / 1000, fp1, label=sys.argv[1])
-    plt.plot(freqs2 / 1000, fp2, label=sys.argv[2], alpha=0.8)
-    plt.xlabel('Frequency (kHz)')
+    plt.plot(np.log10(freqs1), fp1, label=sys.argv[1])
+    plt.plot(np.log10(freqs2), fp2, label=sys.argv[2], alpha=0.8)
+    plt.xlabel('log10(Frequency)')
     plt.ylabel('Normalized Residual')
-    plt.title('Fakeprint Comparison')
+    plt.title('Fakeprint Comparison (log-frequency)')
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
