@@ -3,7 +3,7 @@ attack/*
 .venv/
 .DS_Store
 
-**/_pycache_/
+**/__pycache__/
 
 
 data/ai/sonics
