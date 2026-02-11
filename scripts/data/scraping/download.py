@@ -1,6 +1,7 @@
 """Download MP3s from Suno JSON metadata using async concurrency."""
 
 import json
+import hashlib
 import asyncio
 import argparse
 from pathlib import Path
@@ -13,10 +14,6 @@ TIMEOUT = aiohttp.ClientTimeout(total=120)
 
 
 async def download_one(session: aiohttp.ClientSession, song: dict, output_dir: Path, semaphore: asyncio.Semaphore):
-    dest = output_dir / f"{song['uuid']}.mp3"
-    if dest.exists() and dest.stat().st_size > 0:
-        return True  # already downloaded
-
     async with semaphore:
         try:
             async with session.get(song["url"]) as resp:
@@ -24,6 +21,11 @@ async def download_one(session: aiohttp.ClientSession, song: dict, output_dir: P
                     print(f"  FAIL ({resp.status}): {song['uuid']}")
                     return False
                 data = await resp.read()
+                # Name file by SHA-256 hash of its content
+                sha = hashlib.sha256(data).hexdigest()
+                dest = output_dir / f"{sha}.mp3"
+                if dest.exists():
+                    return True
                 dest.write_bytes(data)
                 return True
         except Exception as e:
