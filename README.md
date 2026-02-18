@@ -1,26 +1,28 @@
 # robust-deepfake-detector
 
+## Project structure
+
 ```
 robust-deepfake-detector/
 ├── data/
 │   ├── ai/
-│   └── human/
+│   ├── human/
+│   └── signals/
 ├── deezer/
+│   ├── sonics/
 │   ├── compute_fakeprints.py
-│   ├── encodec_latent_visualisation.ipynb
 │   ├── train_test_regressor.py
-│   └── sonics/
-│       ├── create_splits.py
-│       └── sonics_split.npy
+│   └── encodec_latent_visualisation.ipynb
 ├── outputs/
 │   └── figures/
 ├── scripts/
 │   ├── attack/
+│   │   ├── create_simple_signals.py
+│   │   ├── resampling/
+│   │   └── soxr/
 │   ├── data/
-│   │   ├── download_fma.py
-│   │   └── download_sonics.py
+│   ├── scraping/
 │   ├── training/
-│   │   └── visualize_weights.py
 │   └── utils.py
 └── src/
     ├── fp/
@@ -78,3 +80,9 @@ drive.mount('/content/drive')
 
 The dataset is stored in this shared Drive folder:
 [suno_v5 — Google Drive](https://drive.google.com/drive/folders/1jMrO05xSY4q9vDRHjjXh2iJcl8-H7g15?usp=sharing)
+## Roles
+
+- **data**: Raw and processed audio: AI vs human tracks, plus synthetic signals for resampling/speed attacks.
+- **deezer**: Fakeprint extraction (EnCodec), dataset splits (Sonics), regressor training and evaluation; notebook for latent viz.
+- **scripts**: Data download (FMA, Sonics), attack pipelines (soxr resampling/speeding, visualisations), training helpers; scraping pipeline (planned).
+- **src**: Persisted fakeprints and trained model artifacts (weights, sonics-vs-fma).

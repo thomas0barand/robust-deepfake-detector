@@ -1,11 +1,10 @@
+attack/*
+
 .venv/
 .DS_Store
 
-**/_pycache_/
+**/__pycache__/
 
-data/*
-!data/ai
-!data/human
 
 data/ai/sonics
 data/human/fma_small
@@ -14,3 +13,29 @@ src/dataset/v5/*.html
 
 .idea
 .env
+.idea
+
+CLAUDE.md
+
+ouputs/figures/fakeprints_explanation.pdf
+
+
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+*.run.xml
+*.bcf
+*.xdv
