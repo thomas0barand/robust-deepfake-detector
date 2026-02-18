@@ -9,7 +9,7 @@ class RobustDetector(L.LightningModule):
     def __init__(
         self,
         feature_dim,
-        use_bias=False,
+        use_bias=True,
         init_std=0.02,
         use_convolution=False,
     ):
