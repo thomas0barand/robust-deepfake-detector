@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--sr", type=int, default=44100, help="Sampling rate used for fakeprints")
-parser.add_argument("--fmin", type=int, default=5000, help="Low freq cutoff")
-parser.add_argument("--fmax", type=int, default=16000, help="High freq cutoff")
+parser.add_argument("--sr", type=int, default=16000, help="Sampling rate used for fakeprints")
+parser.add_argument("--fmin", type=int, default=0, help="Low freq cutoff")
+parser.add_argument("--fmax", type=int, default=8000, help="High freq cutoff")
 args = parser.parse_args()
 
 # Load weights
-weights_data = np.load("outputs/models/weights.npy", allow_pickle=True).item()
+weights_data = np.load("src/models/sonics-vs-fma-16kHz.npy", allow_pickle=True).item()
 W = weights_data["W"].flatten()
 B = weights_data["B"][0]
 
@@ -25,6 +25,7 @@ x_freqs = np.linspace(0, SR / 2, num=(N_FFT//2)+1)
 # Filter to the range used in fakeprints
 freq_mask = (x_freqs >= FMIN) & (x_freqs <= min(FMAX, SR/2))
 frequencies = x_freqs[freq_mask]
+print(len(frequencies), len(W))
 
 # Ensure same length as weights
 frequencies = frequencies[:len(W)]
