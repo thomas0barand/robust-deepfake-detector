@@ -10,12 +10,20 @@ class RobustDetector(L.LightningModule):
         self,
         feature_dim,
         use_bias=True,
+        use_norm=True,
         init_std=0.02,
         use_convolution=False,
     ):
         super().__init__()
         self.use_convolution = use_convolution
-        self.linear_proj = LinearProj(feature_dim, use_bias=use_bias, init_std=init_std)
+
+        self.linear_proj = LinearProj(
+            feature_dim=feature_dim,
+            use_bias=use_bias,
+            use_norm=use_norm,
+            init_std=init_std,
+        )
+        
         self.loss_fn = nn.BCEWithLogitsLoss()
         self.sigmoid = nn.Sigmoid()
 
