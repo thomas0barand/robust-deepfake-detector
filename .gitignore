@@ -9,6 +9,10 @@ attack/*
 data/ai/sonics
 data/human/fma_small
 
+src/dataset/v5/*.html
+
+.idea
+.env
 .idea
 
 CLAUDE.md
