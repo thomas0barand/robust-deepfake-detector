@@ -103,7 +103,7 @@ def get_fakeprint(
     spectrum: np.ndarray | torch.Tensor,
     sr: int,
     bins_per_octave: int = 96,
-    f_range: tuple[float, float] = (5000, 16000),
+    f_range: tuple[float, float] = (100, 44000),
     mode: str = "stft",
     log: bool = False,
     raw: bool = False,

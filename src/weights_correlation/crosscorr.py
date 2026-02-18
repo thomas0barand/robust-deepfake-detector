@@ -89,8 +89,8 @@ def plot_cross_correlation(
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    original_path = "data/signals/originals/signal2.mp3"
-    spedup_path = "data/signals/spedup/signal2_s.mp3"
+    original_path = "data/ai/fake_00001_suno_1.mp3"
+    spedup_path = "data/signals/spedup/fake_suno_0_su.mp3"
 
     waveform, sr = torchaudio.load(original_path)
     su_waveform, su_sr = torchaudio.load(spedup_path)
