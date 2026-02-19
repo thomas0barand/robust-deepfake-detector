@@ -4,17 +4,19 @@ import numpy as np
 import torch.nn as nn
 import lightning as L
 
+from torchaudio.transforms import Spectrogram
 from nnAudio.features import CQT
 from torchmetrics import AUROC, F1Score, Accuracy
 
 from src.models.linear import LinearProj
-from src.models.utils import get_cqt, get_freqs, get_fakeprints
+from src.models.utils import get_spectrum, get_freqs, get_fakeprints
 
 class RobustDetector(L.LightningModule):
     def __init__(
         self,
         # Model params
         feature_dim,
+        use_cqt=True,
         use_bias=True,
         use_norm=True,
         init_std=0.02,
@@ -34,6 +36,7 @@ class RobustDetector(L.LightningModule):
         super().__init__()
 
         self.feature_dim = feature_dim
+        self.use_cqt = use_cqt
         self.use_bias = use_bias
         self.use_norm = use_norm
         self.use_convolution = use_convolution
@@ -50,7 +53,7 @@ class RobustDetector(L.LightningModule):
         n_octaves = np.log2(nyquist / f_min) - 0.1  # Subtract a small margin to ensure we don't exceed Nyquist
         nbins = int(n_octaves * bins_per_octave)  # Total number of CQT bins to cover the desired frequency range
 
-        self.cqt_layer = CQT(
+        self.cqt_transform = CQT(
             sr=sampling_rate,
             hop_length=hop_length,
             fmin=f_min,
@@ -60,7 +63,16 @@ class RobustDetector(L.LightningModule):
             verbose=False,
         )
 
-        self.freqs, self.freq_mask = get_freqs(nbins, sampling_rate, bins_per_octave, freq_range=freq_range, f_min=f_min)
+        self.stft_transform = Spectrogram(n_fft=n_fft, power=2, hop_length=hop_length)
+
+        self.freqs, self.freq_mask = get_freqs(
+            nbins,
+            sampling_rate,
+            transform="cqt" if use_cqt else "stft",
+            bins_per_octave=bins_per_octave,
+            freq_range=freq_range,
+            f_min=f_min
+        )
 
         self.linear_proj = LinearProj(
             feature_dim=feature_dim,
@@ -86,8 +98,9 @@ class RobustDetector(L.LightningModule):
         Returns: (1, feature_dim)
         """
         waveform = waveform.mean(dim=0, keepdim=True)  # Convert to mono
-        cqt = get_cqt(self.cqt_layer, waveform) # (1, n_bins, T')
-        spec = cqt.mean(dim=-1).squeeze(0)  # (n_bins,)
+        transform = self.cqt_transform if self.use_cqt else self.stft_transform
+        spec = get_spectrum(transform, waveform) # (1, n_bins, T')
+        spec = spec.mean(dim=-1).squeeze(0)  # (n_bins,)
         
         spec_crop = spec[self.freq_mask]
         fp = get_fakeprints(spec_crop, self.freqs)
@@ -133,12 +146,12 @@ class RobustDetector(L.LightningModule):
     
 
     def on_save_checkpoint(self, checkpoint: dict) -> None:
-        # Remove CQT layer from state dict
-        keys_to_remove = [k for k in checkpoint["state_dict"] if k.startswith("cqt_layer")]
+        # Remove CQT transform from state dict
+        keys_to_remove = [k for k in checkpoint["state_dict"] if k.startswith("cqt_transform")]
         for k in keys_to_remove:
             del checkpoint["state_dict"][k]
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
-        cqt_state = {k: v for k, v in self.cqt_layer.state_dict().items()}
+        cqt_state = {k: v for k, v in self.cqt_transform.state_dict().items()}
         for k, v in cqt_state.items():
-            checkpoint["state_dict"][f"cqt_layer.{k}"] = v
+            checkpoint["state_dict"][f"cqt_transform.{k}"] = v

@@ -13,12 +13,13 @@ from src.models.utils import get_feature_dim
 
 def train(
     data_dir: str,
+    mode: str = "cqt",
     # Dataset
     val_split: float = 0.2,
     # Model
     use_bias: bool = True,
     use_norm: bool = True,
-    use_convolution: bool = False,
+    use_convolution: bool = True,
     # CQT
     n_fft: int = 16384,
     sampling_rate: int = 48000,
@@ -39,7 +40,7 @@ def train(
 ):
     L.seed_everything(seed)
 
-    dataset = FakeprintDataset(data_dir)
+    dataset = FakeprintDataset(data_dir, mode=mode)
 
     n_val = int(val_split * len(dataset))
     n_train = len(dataset) - n_val
@@ -56,7 +57,7 @@ def train(
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True,  num_workers=num_workers, pin_memory=True)
     val_loader   = DataLoader(val_set,   batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
 
-    feature_dim = get_feature_dim(sampling_rate, bins_per_octave, freq_range, f_min)
+    feature_dim = get_feature_dim(n_fft, sampling_rate, transform=mode, bins_per_octave=bins_per_octave, freq_range=freq_range, f_min=f_min)
     print(f"Feature dimension: {feature_dim}")
 
     model = RobustDetector(
@@ -76,7 +77,7 @@ def train(
 
     checkpoint_cb = ModelCheckpoint(
         dirpath=ckpt_dir,
-        filename=f"robustdetector-use_conv={use_convolution}",
+        filename=f"robustdetector-{mode}-use_conv={use_convolution}",
         monitor="val_auroc",
         mode="max",
         save_top_k=1,
@@ -108,6 +109,10 @@ def train(
 if __name__ == "__main__":
     best_ckpt = train(
         data_dir="src/checkpoints/fp/",
+        mode="stft",
+        use_bias=True,
+        use_norm=True,
+        use_convolution=False,
         freq_range=[200, 6000],
         batch_size=64,
         max_epochs=50,
