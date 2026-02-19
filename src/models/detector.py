@@ -66,8 +66,8 @@ class RobustDetector(L.LightningModule):
         self.stft_transform = Spectrogram(n_fft=n_fft, power=2, hop_length=hop_length)
 
         self.freqs, self.freq_mask = get_freqs(
-            nbins,
-            sampling_rate,
+            n_fft=n_fft,
+            sr=sampling_rate,
             transform="cqt" if use_cqt else "stft",
             bins_per_octave=bins_per_octave,
             freq_range=freq_range,

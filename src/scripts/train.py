@@ -57,11 +57,14 @@ def train(
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True,  num_workers=num_workers, pin_memory=True)
     val_loader   = DataLoader(val_set,   batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
 
+    
     feature_dim = get_feature_dim(n_fft, sampling_rate, transform=mode, bins_per_octave=bins_per_octave, freq_range=freq_range, f_min=f_min)
+    use_cqt = (mode == "cqt")
     print(f"Feature dimension: {feature_dim}")
 
     model = RobustDetector(
         feature_dim=feature_dim,
+        use_cqt=use_cqt,
         use_bias=use_bias,
         use_norm=use_norm,
         use_convolution=use_convolution,
@@ -112,7 +115,7 @@ if __name__ == "__main__":
         mode="stft",
         use_bias=True,
         use_norm=True,
-        use_convolution=False,
+        use_convolution=True,
         freq_range=[200, 6000],
         batch_size=64,
         max_epochs=50,

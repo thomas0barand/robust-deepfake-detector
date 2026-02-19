@@ -1,4 +1,3 @@
-import numpy as np
 import matplotlib.pyplot as plt
 
 from src.models.detector import RobustDetector
@@ -14,6 +13,7 @@ def plot_weights(
     # Extract linear weights (1, feature_dim)
     weights = model.linear_proj.weights.detach().cpu().numpy().squeeze()  # (feature_dim,)
     freqs = model.freqs.detach().cpu().numpy()  # (feature_dim,)
+    print(freqs.shape, weights.shape)
 
     assert len(weights) == len(freqs), f"Shape mismatch: weights {weights.shape} vs freqs {freqs.shape}"
 
