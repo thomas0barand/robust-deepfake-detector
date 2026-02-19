@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from scipy import interpolate
 
-F_MIN = 32.7
+F_MIN = 32.7 # C1 note frequency
 
 def get_stft(waveform, n_fft, hop_length):
     if waveform.ndim == 1:
@@ -86,17 +86,21 @@ def get_fakeprint(
     low_hull_curve = np.clip(low_hull_curve, dB_range[0], None)
     
     residue = np.clip(fp_crop - low_hull_curve, 0, dB_range[1])
-    residue = residue / (1e-6 + np.max(residue))
+    #residue = residue / (1e-6 + np.max(residue))
     
     return freqs, residue
 
 
+def rms_norm(x, eps=1e-8):
+    norm = np.sqrt(np.mean(x**2, axis=-1, keepdims=True) + eps)
+    return x / norm
+
+
 def get_correlation(fp1, fp2):
-    fp1 = (fp1 - np.mean(fp1)) / (np.std(fp1) + 1e-10)
-    fp2 = (fp2 - np.mean(fp2)) / (np.std(fp2) + 1e-10)
-    print(fp1.shape, fp2.shape)
+    fp1 = rms_norm(fp1)
+    fp2 = rms_norm(fp2)
+
     corr = np.convolve(fp1, fp2[::-1], mode='full') / len(fp1)
-    print(corr.shape)
     lags = np.arange(-len(fp2) + 1, len(fp1))
     return lags, corr
 

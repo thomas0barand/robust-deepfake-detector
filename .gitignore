@@ -8,6 +8,7 @@ __pycache__/
 
 data/ai/sonics
 data/human/fma_small
+logs/
 
 .idea
 
