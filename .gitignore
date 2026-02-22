@@ -9,7 +9,7 @@ attack/*
 *.mp3
 *.csv
 
-src/dataset/v5/*.html
+src/dataset/v5/*
 
 .idea
 .env
