@@ -9,7 +9,9 @@ attack/*
 *.mp3
 *.csv
 
-src/dataset/v5/*
+data/raw
+data/interim
+data/processed
 
 .idea
 .env
