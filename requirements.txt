@@ -68,3 +68,4 @@ tzdata==2025.3
 urllib3==2.6.3
 wcwidth==0.2.14
 dotenv==0.9.9
+datasets==4.5.0

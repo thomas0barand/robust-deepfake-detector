@@ -86,3 +86,78 @@ The dataset is stored in this shared Drive folder:
 - **deezer**: Fakeprint extraction (EnCodec), dataset splits (Sonics), regressor training and evaluation; notebook for latent viz.
 - **scripts**: Data download (FMA, Sonics), attack pipelines (soxr resampling/speeding, visualisations), training helpers; scraping pipeline (planned).
 - **src**: Persisted fakeprints and trained model artifacts (weights, sonics-vs-fma).
+
+## Data Collection Strategy
+
+Chosen approach:
+- ingestion happens in notebooks
+- notebooks export source-specific raw CSV files in a shared raw format
+- `scripts/data/collection/manifest_pipeline.py` merges, normalizes, and deduplicates raw CSVs into one processed manifest
+
+### Canonical schema
+
+- JSON Schema: `scripts/data/collection/dataset_schema_v1.json`
+
+### Collection components
+
+- `scripts/data/collection/ingest_hf_dataset.ipynb`
+- `scripts/data/collection/ingest_json_dataset.ipynb`
+- `scripts/data/collection/manifest_pipeline.py`
+
+### Workflow
+
+```bash
+# 1) In notebooks, export each source to a raw CSV.
+#    - HF source -> ingest_hf_dataset.ipynb
+#    - JSON source -> ingest_json_dataset.ipynb
+
+# 2) Build the processed manifest from raw CSVs:
+python scripts/data/collection/manifest_pipeline.py \
+  --raw-input data/raw/hf_suno.csv \
+  --raw-input data/raw/hf_udio.csv \
+  --raw-input data/raw/suno_v5.csv \
+  --output data/processed/manifest_v1.csv
+```
+
+The output manifest is deduplicated and normalized to schema version `v1`.
+
+### Example notebook mapping (`nyuuzyou/suno`)
+
+```python
+from datasets import load_dataset
+import json
+import pandas as pd
+
+ds = load_dataset("nyuuzyou/suno", split="train")
+df = ds.to_pandas()
+
+norm = pd.DataFrame(
+    {
+        "source": "hf_suno",
+        "source_track_id": df["id"],
+        "audio_uri": df["audio_url"],
+        "title": df.get("title"),
+        "artist": df.get("display_name"),
+        "username": df.get("handle"),
+        "generator": "suno",
+        "generator_version": df.get("major_model_version"),
+        "metadata": df.apply(
+            lambda r: json.dumps(
+                {
+                    "model_name": r.get("model_name"),
+                    "metadata_prompt": r.get("metadata_prompt"),
+                    "metadata_tags": r.get("metadata_tags"),
+                    "metadata_duration": r.get("metadata_duration"),
+                },
+                default=str,
+            ),
+            axis=1,
+        ),
+    }
+)
+
+norm.to_csv("data/raw/hf_suno.csv", index=False)
+```
+
+
+

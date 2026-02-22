@@ -8,6 +8,10 @@ attack/*
 
 data/ai/sonics
 data/human/fma_small
+data/raw
+data/interim
+data/processed
+
 
 src/dataset/v5/*.html
 
