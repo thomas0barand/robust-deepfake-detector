@@ -47,16 +47,16 @@ echo "GDRIVE_API_KEY=your_key_here" > .env
 source .env
 
 # option C: inline
-python scripts/data/get_dataset.py --api-key your_key_here
+python scripts/data/download_suno_5_gdrive.py --api-key your_key_here
 ```
 
 5. Run the download script:
 
 ```bash
-python scripts/data/get_dataset.py -o data/suno_v5
+python scripts/data/download_suno_5_gdrive.py -o data/suno_v5
 
 # or a subset
-python scripts/data/get_dataset.py -o data/suno_v5 -n 1000
+python scripts/data/download_suno_5_gdrive.py -o data/suno_v5 -n 1000
 ```
 
 ### Upload to Google Drive (Colab)

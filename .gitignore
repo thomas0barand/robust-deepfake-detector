@@ -5,13 +5,9 @@ attack/*
 
 **/__pycache__/
 
-
-data/ai/sonics
-data/human/fma_small
-data/raw
-data/interim
-data/processed
-
+# Large files
+*.mp3
+*.csv
 
 src/dataset/v5/*.html
 
