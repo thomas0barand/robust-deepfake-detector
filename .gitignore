@@ -10,7 +10,6 @@ lightning_logs/
 
 # Large files
 *.mp3
-*.csv
 
 data/raw
 data/interim
