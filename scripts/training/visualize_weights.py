@@ -1,51 +1,44 @@
-import numpy as np
 import matplotlib.pyplot as plt
-import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--sr", type=int, default=16000, help="Sampling rate used for fakeprints")
-parser.add_argument("--fmin", type=int, default=0, help="Low freq cutoff")
-parser.add_argument("--fmax", type=int, default=8000, help="High freq cutoff")
-args = parser.parse_args()
+from src.models.detector import RobustDetector
 
-# Load weights
-weights_data = np.load("src/models/sonics-vs-fma-16kHz.npy", allow_pickle=True).item()
-W = weights_data["W"].flatten()
-B = weights_data["B"][0]
 
-# Compute frequency axis (matching compute_fakeprints.py)
-N_FFT = 1 << 14  # 16384
-SR = args.sr
-FMIN = args.fmin
-FMAX = args.fmax
+def plot_weights(
+    ckpt_path: str,
+    output_path: str = None,
+):
+    model = RobustDetector.load_from_checkpoint(ckpt_path)
+    model.eval()
 
-# Full frequency range
-x_freqs = np.linspace(0, SR / 2, num=(N_FFT//2)+1)
+    # Extract linear weights (1, feature_dim)
+    weights = model.linear_proj.weights.detach().cpu().numpy().squeeze()  # (feature_dim,)
+    freqs = model.freqs.detach().cpu().numpy()  # (feature_dim,)
 
-# Filter to the range used in fakeprints
-freq_mask = (x_freqs >= FMIN) & (x_freqs <= min(FMAX, SR/2))
-frequencies = x_freqs[freq_mask]
-print(len(frequencies), len(W))
+    assert len(weights) == len(freqs), f"Shape mismatch: weights {weights.shape} vs freqs {freqs.shape}"
 
-# Ensure same length as weights
-frequencies = frequencies[:len(W)]
+    plt.figure(figsize=(14, 6))
+    plt.plot(freqs, weights, linewidth=0.8, alpha=0.8)
+    plt.axhline(0, color='red', linestyle='--', linewidth=1, alpha=0.5)
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Weight Value')
+    plt.title('Logistic Regression Weights vs Frequency (positive = AI indicator, negative = Human indicator)')
+    plt.grid(alpha=0.3)
+    plt.xscale("log")
+    plt.tight_layout()
 
-print(f"Number of features: {len(W)}")
-print(f"Sampling rate: {SR} Hz")
-print(f"Frequency range: [{frequencies[0]:.0f}, {frequencies[-1]:.0f}] Hz")
-print(f"Intercept: {B:.4f}")
-print(f"Weight range: [{W.min():.4f}, {W.max():.4f}]")
-print(f"Mean: {W.mean():.4f}, Std: {W.std():.4f}")
+    if output_path:
+        plt.savefig(output_path, dpi=150, bbox_inches="tight")
+        print(f"Saved to {output_path}")
+    else:
+        plt.show()
 
-# Plot: weight values vs frequency
-plt.figure(figsize=(14, 6))
-plt.plot(frequencies, W, linewidth=0.8, alpha=0.8)
-plt.axhline(0, color='red', linestyle='--', linewidth=1, alpha=0.5)
-plt.xlabel('Frequency (Hz)')
-plt.ylabel('Weight Value')
-plt.title('Logistic Regression Weights vs Frequency (positive = AI indicator, negative = Human indicator)')
-plt.grid(alpha=0.3)
-plt.tight_layout()
-plt.savefig('outputs/figures/weights.png', dpi=300, bbox_inches='tight')
-print("\nSaved to outputs/figures/weights.png")
-plt.show()
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ckpt_path", type=str, help="Path to .ckpt file")
+    parser.add_argument("--output", type=str, default=None, help="Optional path to save the figure")
+    args = parser.parse_args()
+
+    plot_weights(args.ckpt_path, output_path=args.output)

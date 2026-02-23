@@ -80,7 +80,7 @@ The best `.ckpt` is saved to `--ckpt_dir`. It can be used directly for inference
 
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
-python src/scripts/train.py \
+python scripts/training/train.py \
     --data_dir src/checkpoints/fp/ \
     --mode stft \
     --batch_size 64 \
@@ -98,11 +98,10 @@ To evaluate the best checkpoint on the test set, run:
 
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
-python src/scripts/test.py \
-    --data_dir src/checkpoints/fp/ \
-    --ckpt_path src/checkpoints/models/best_model.ckpt \
+python scripts/test.py \
+    --data_dir src/checkpoints/attack/ \
+    --ckpt_path src/checkpoints/models/model.ckpt \
     --output_dir results/ \
-    --use_convolution
 ```
 
 ### Key flags
