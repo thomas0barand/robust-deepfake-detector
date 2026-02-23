@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Robust Deepfake Detector Canonical Audio Manifest",
+  "description": "Canonical row-level schema for aggregated AI audio sources",
+  "type": "object",
+  "required": [
+    "sample_id",
+    "source",
+    "source_track_id",
+    "generator",
+    "generator_version",
+    "label",
+    "audio_uri",
+    "ingested_at",
+    "schema_version"
+  ],
+  "properties": {
+    "sample_id": { "type": "string", "description": "Stable UUID for canonical sample row" },
+    "source": { "type": "string", "description": "Data source identifier, e.g. hf_suno35, hf_udio, json_suno50" },
+    "source_track_id": { "type": "string", "description": "Original source identifier" },
+    "generator": { "type": "string", "enum": ["suno", "udio", "human", "unknown"] },
+    "generator_version": { "type": "string", "description": "Model/version label, e.g. 3.5, 5.0" },
+    "label": { "type": "string", "enum": ["ai", "human"] },
+    "label_confidence": { "type": ["number", "null"], "minimum": 0.0, "maximum": 1.0 },
+    "split": { "type": ["string", "null"], "enum": ["train", "val", "test", null] },
+    "audio_uri": { "type": "string", "format": "uri" },
+    "audio_local_path": { "type": ["string", "null"] },
+    "title": { "type": ["string", "null"] },
+    "artist": { "type": ["string", "null"] },
+    "username": { "type": ["string", "null"] },
+    "styles": {
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        { "type": "null" }
+      ]
+    },
+    "metadata": { "type": ["object", "null"], "additionalProperties": true },
+    "duration_sec": { "type": ["number", "null"], "minimum": 0 },
+    "sample_rate": { "type": ["integer", "null"], "minimum": 1 },
+    "channels": { "type": ["integer", "null"], "minimum": 1 },
+    "bitrate": { "type": ["integer", "null"], "minimum": 1 },
+    "license": { "type": ["string", "null"] },
+    "usage_rights": { "type": ["string", "null"] },
+    "sha256": { "type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$" },
+    "ingested_at": { "type": "string", "format": "date-time" },
+    "schema_version": { "type": "string", "const": "v1" }
+  },
+  "additionalProperties": false
+}

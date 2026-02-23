@@ -5,10 +5,16 @@ attack/*
 
 **/__pycache__/
 
+# Large files
+*.mp3
+*.csv
 
-data/ai/sonics
-data/human/fma_small
+data/raw
+data/interim
+data/processed
 
+.idea
+.env
 .idea
 
 CLAUDE.md
