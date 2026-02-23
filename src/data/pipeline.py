@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument("--speed_up", action="store_true", help="Whether to apply random speed changes for data augmentation")
     parser.add_argument("--shard_size", type=int, default=500, help="Number of files to process per shard")
     parser.add_argument("--shard_start", type=int, default=0, help="Shard index to start from (for resuming)")
-    parser.add_argument("--shard_end", type=int, default=None, help="Shard index to end at (exclusive)")
+    parser.add_argument("--num_shards", type=int, default=None, help="Total number of shards to process (for resuming)")
     parser.add_argument("--n_fft", type=int, default=16384, help="FFT size")
     parser.add_argument("--sampling_rate", type=int, default=48000, help="Target sampling rate for audio")
     parser.add_argument("--bins_per_octave", type=int, default=96, help="Number of CQT bins per octave")
@@ -103,6 +103,7 @@ def preprocess_fakeprints(
 
     cqt_fakeprints = []
     stft_fakeprints = []
+    speed_factors = []
     for path in tqdm(file_paths, leave=False):
         try:
             waveform, sr = torchaudio.load(path, channels_first=True)
@@ -110,13 +111,16 @@ def preprocess_fakeprints(
             print(f"Error loading {path}: {e}")
             continue
         
+        if manip_func is not None:
+            speed_factor = np.random.uniform(0.9, 1.1) # Random speed factor for augmentation
+            waveform = manip_func(waveform, sr, speed_factor)
+            speed_factors.append(speed_factor)
+        else:
+            speed_factors.append(1.0)
+
         if sr != sampling_rate:
             waveform = soxr.resample(waveform.T, sr, sampling_rate, quality="VHQ").T
             waveform = torch.from_numpy(waveform).to(device)
-
-        if manip_func is not None:
-            speed_factor = np.random.uniform(0.9, 1.1) # Random speed factor for augmentation
-            waveform = manip_func(waveform, sampling_rate, speed_factor)
 
         waveform = waveform.mean(dim=0, keepdim=True).to(device)  # Convert to mono
 
@@ -137,6 +141,7 @@ def preprocess_fakeprints(
     return {
         "cqt": torch.stack(cqt_fakeprints, dim=0).cpu().numpy(),
         "stft": torch.stack(stft_fakeprints, dim=0).cpu().numpy(),
+        "speed_factors": np.array(speed_factors),
         "n_fft": n_fft,
         "sampling_rate": sampling_rate,
         "bins_per_octave": bins_per_octave,
@@ -151,7 +156,7 @@ def pipeline(
     manip_func=None,
     shard_size=500,
     shard_start=0,
-    shard_end=None,
+    num_shards=None,
     n_fft=16384,
     sampling_rate=48000,
     bins_per_octave=96,
@@ -164,7 +169,7 @@ def pipeline(
     shards = [file_paths[i:i+shard_size] for i in range(0, len(file_paths), shard_size)]
     print(f"Total files: {len(file_paths)}, Shards: {len(shards)}")
 
-    end = len(shards) if not shard_end else shard_end
+    end = len(shards) if not num_shards else min(shard_start + num_shards, len(shards))
     for i in trange(shard_start, end):
         shard_paths = shards[i]
         shard = preprocess_fakeprints(
@@ -188,7 +193,7 @@ if __name__ == "__main__":
         manip_func=manip_func,
         shard_size=args.shard_size,
         shard_start=args.shard_start,
-        shard_end=args.shard_end,
+        num_shards=args.num_shards,
         n_fft=args.n_fft,
         sampling_rate=args.sampling_rate,
         bins_per_octave=args.bins_per_octave,

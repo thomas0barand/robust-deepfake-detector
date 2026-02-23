@@ -43,7 +43,7 @@ To process to .mp3 files into fakeprints, run:
 export PYTHONPATH=$PYTHONPATH:.
 python src/scripts/preprocess.py \
     --data_dir data/ \
-    --output_dir src/checkpoints/fp/ \
+    --output_dir src/checkpoints/train/ai \
     --mode stft \
     --n_fft 16384 \
     --sampling_rate 48000 \
@@ -51,10 +51,10 @@ python src/scripts/preprocess.py \
     --freq_range 200 6000
 ```
 
-You will find the output fakeprints in `src/checkpoints/fp/` with both `stft` and `cqt` in a `.npz` format:
+You will find the output fakeprints in `src/checkpoints/train/ai/` with both `stft` and `cqt` in a `.npz` format:
 
 ```
-src/checkpoints/fp/ai/
+src/checkpoints/train/ai/
 ├── fakeprints_01.npz
 ├── fakeprints_02.npz
 └── ...
@@ -81,7 +81,7 @@ The best `.ckpt` is saved to `--ckpt_dir`. It can be used directly for inference
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
 python scripts/training/train.py \
-    --data_dir src/checkpoints/fp/ \
+    --data_dir src/checkpoints/train/ \
     --mode stft \
     --batch_size 64 \
     --max_epochs 50 \
@@ -99,7 +99,7 @@ To evaluate the best checkpoint on the test set, run:
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
 python scripts/test.py \
-    --data_dir src/checkpoints/attack/ \
+    --data_dir src/checkpoints/test/attack/ \
     --ckpt_path src/checkpoints/models/model.ckpt \
     --output_dir results/ \
 ```
@@ -108,7 +108,7 @@ python scripts/test.py \
 
 | Flag | Default | Description |
 |---|---|---|
-| `--data_dir` | `src/checkpoints/fp/` | Path to preprocessed `.npz` fakeprints |
+| `--data_dir` | `src/checkpoints/train/` | Path to preprocessed `.npz` fakeprints |
 | `--mode` | `stft` | Transform type: `stft` or `cqt` |
 | `--val_split` | `0.2` | Fraction of data held out for validation |
 | `--use_convolution` / `--no-use_convolution` | `True` | Enable convolutional layers |

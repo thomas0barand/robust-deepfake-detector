@@ -15,11 +15,11 @@ from src.models.utils import get_feature_dim
 def parse_args():
     parser = argparse.ArgumentParser(description="Train RobustDetector")
 
-    parser.add_argument("--data_dir", type=str, default="src/checkpoints/fp/")
+    parser.add_argument("--data_dir", type=str, default="src/checkpoints/train/")
     parser.add_argument("--mode", type=str, default="stft", choices=["cqt", "stft"])
 
     # Dataset
-    parser.add_argument("--val_split", type=float, default=0.2)
+    parser.add_argument("--val_split", type=float, default=0.1)
 
     # Model
     parser.add_argument("--use_bias", action=argparse.BooleanOptionalAction, default=True)
@@ -89,9 +89,10 @@ def train(args):
         weight_decay=args.weight_decay,
     )
 
+    filename = f"robustdetector-{args.mode}-use_conv" if args.use_convolution else f"robustdetector-{args.mode}"
     checkpoint_cb = ModelCheckpoint(
         dirpath=args.ckpt_dir,
-        filename=f"robustdetector-{args.mode}-use_conv={args.use_convolution}",
+        filename=filename,
         monitor="val_auroc",
         mode="max",
         save_top_k=1,

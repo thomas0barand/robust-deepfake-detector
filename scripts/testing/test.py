@@ -12,9 +12,10 @@ from src.data.dataset import FakeprintDataset
 def parse_args():
     parser = argparse.ArgumentParser(description="Test RobustDetector")
 
-    parser.add_argument("--data_dir", type=str, default="src/checkpoints/fp/")
+    parser.add_argument("--data_dir", type=str, default="src/checkpoints/test/attack/", help="Directory containing test fakeprint data")
+    parser.add_argument("--output_dir", type=str, default="results/attack/", help="Directory to save test results")
     parser.add_argument("--ckpt_path", type=str, required=True, help="Path to model checkpoint")
-    parser.add_argument("--output_dir", type=str, default="results")
+
 
     # Convolution
     parser.add_argument("--use_convolution", action=argparse.BooleanOptionalAction, default=True, help="Whether to use convolution during testing")
@@ -28,7 +29,7 @@ def test(args):
     L.seed_everything(args.seed)
 
     mode = "cqt" if "cqt" in args.ckpt_path else "stft"
-    train_conv = True if "conv=True" in args.ckpt_path else False
+    train_conv = True if "use_conv" in args.ckpt_path else False
     print(f"Testing {mode} model (trained with convolution={train_conv}) on {mode} data with convolution={args.use_convolution}")
 
     dataset = FakeprintDataset(args.data_dir, mode=mode)
@@ -38,7 +39,8 @@ def test(args):
     model = RobustDetector.load_from_checkpoint(args.ckpt_path)
     model.use_convolution = args.use_convolution
 
-    trainer = L.Trainer(deterministic=True, logger=CSVLogger(args.output_dir, name=f"{mode}-conv={train_conv},{args.use_convolution}"))
+    name = f"{mode}-train_conv={train_conv}-test_conv={args.use_convolution}"
+    trainer = L.Trainer(deterministic=True, logger=CSVLogger(args.output_dir, name=name))
     trainer.test(model, test_loader)
 
 

@@ -24,9 +24,3 @@ class FakeprintDataset(Dataset):
     def __getitem__(self, idx):
         fp, label = self.samples[idx]
         return torch.from_numpy(fp).float(), torch.tensor(label).float()
-    
-
-if __name__ == "__main__":
-    dataset = FakeprintDataset("src/checkpoints/attack/", mode="cqt")
-    for fp, label in dataset:
-        print(fp.shape, label)
