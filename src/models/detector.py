@@ -21,7 +21,7 @@ class RobustDetector(L.LightningModule):
         init_std=0.02,
         use_convolution=False,
         # Transform params
-        freq_range=[500, 16000],
+        freq_range=[5000, 16000],
         n_fft=16384,  # 2**14
         sampling_rate=44100,
         bins_per_octave=192,
