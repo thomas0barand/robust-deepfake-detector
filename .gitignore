@@ -1,12 +1,9 @@
-attack/*
-
 .venv/
 .DS_Store
 
 **/__pycache__/
 
 logs/
-lightning_logs/
 outputs/
 results/
 
@@ -22,9 +19,6 @@ data/processed
 .idea
 
 CLAUDE.md
-
-ouputs/figures/fakeprints_explanation.pdf
-
 
 
 # LaTeX build artifacts
