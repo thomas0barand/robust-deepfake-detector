@@ -1,32 +1,30 @@
 import torch
 
-import numpy as np
 import torch.nn as nn
 import lightning as L
 
-from torchaudio.transforms import Spectrogram
-from nnAudio.features import CQT
+from nnAudio.features import STFT, CQT
 from torchmetrics import AUROC, F1Score, Precision, Accuracy
 
-from src.models.linear import LinearProj
-from src.models.utils import get_spectrum, get_freqs, get_fakeprints
+from src.models import LinearProj
+from src.utils import get_spectrum, get_freqs, get_freqs_mask, get_fakeprints
 
 class RobustDetector(L.LightningModule):
     def __init__(
         self,
         # Model params
-        feature_dim,
-        use_cqt=True,
+        transform_type="stft",
         use_bias=True,
         use_norm=True,
         init_std=0.02,
         use_convolution=False,
-        # CQT params
+        # Transform params
+        freq_range=[300, 10000],
         n_fft=16384,  # 2**14
-        sampling_rate=48000,
-        bins_per_octave=96,
-        freq_range=[200, 6000],
-        f_min=32.7,
+        sampling_rate=44100,
+        bins_per_octave=192,
+        hull_area=20,
+        fmin=32.7,
         # Loss params
         pos_weight=None,
         # Optimizer params
@@ -35,47 +33,61 @@ class RobustDetector(L.LightningModule):
     ):
         super().__init__()
 
-        self.feature_dim = feature_dim
-        self.use_cqt = use_cqt
+        self.transform_type = transform_type
         self.use_bias = use_bias
         self.use_norm = use_norm
         self.use_convolution = use_convolution
+        self.freq_range = freq_range
         self.n_fft = n_fft
         self.sampling_rate = sampling_rate
         self.bins_per_octave = bins_per_octave
-        self.freq_range = freq_range
-        self.f_min = f_min
+        self.hull_area = hull_area
+        self.fmin = fmin
         self.lr = lr
         self.weight_decay = weight_decay
 
         hop_length = n_fft // 2
-        nyquist = sampling_rate / 2  # Maximum frequency that can be represented
-        n_octaves = np.log2(nyquist / f_min) - 0.1  # Subtract a small margin to ensure we don't exceed Nyquist
-        nbins = int(n_octaves * bins_per_octave)  # Total number of CQT bins to cover the desired frequency range
+        fmax = sampling_rate / 2  # Maximum frequency that can be represented
 
-        self.cqt_transform = CQT(
-            sr=sampling_rate,
-            hop_length=hop_length,
-            fmin=f_min,
-            n_bins=nbins,
-            bins_per_octave=bins_per_octave,
-            output_format="Magnitude",
-            verbose=False,
-        )
+        if transform_type == "stft":
+            self.transform = STFT(
+                n_fft=n_fft,
+                sr=sampling_rate,
+                hop_length=hop_length,
+                fmin=fmin,
+                fmax=fmax,
+                output_format="Magnitude",
+                verbose=False,
+            )
+        elif transform_type == "cqt":
+            self.transform = CQT(
+                sr=sampling_rate,
+                hop_length=hop_length,
+                fmin=fmin,
+                fmax=fmax,
+                bins_per_octave=bins_per_octave,
+                output_format="Magnitude",
+                verbose=False,
+            )
+        else:
+            raise ValueError(f"Unsupported transform: {transform_type}")
+        
 
-        self.stft_transform = Spectrogram(n_fft=n_fft, power=2, hop_length=hop_length)
-
-        self.freqs, self.freq_mask = get_freqs(
+        log = (transform_type == "cqt")
+        self.freqs = get_freqs(
             n_fft=n_fft,
             sr=sampling_rate,
-            transform="cqt" if use_cqt else "stft",
+            log=log, 
             bins_per_octave=bins_per_octave,
-            freq_range=freq_range,
-            f_min=f_min
+            fmin=fmin
         )
 
+        self.mask = get_freqs_mask(self.freqs, sampling_rate, freq_range)
+
+        self.feature_dim = len(self.freqs[self.mask])
+
         self.linear_proj = LinearProj(
-            feature_dim=feature_dim,
+            feature_dim=self.feature_dim,
             use_bias=use_bias,
             use_norm=use_norm,
             init_std=init_std,
@@ -99,13 +111,12 @@ class RobustDetector(L.LightningModule):
         Returns: (1, feature_dim)
         """
         waveform = waveform.mean(dim=0, keepdim=True)  # Convert to mono
-        transform = self.cqt_transform if self.use_cqt else self.stft_transform
-        spec = get_spectrum(transform, waveform) # (1, n_bins, T')
-        spec = spec.mean(dim=-1).squeeze(0)  # (n_bins,)
+        spec = get_spectrum(self.transform, waveform) # (1, n_bins, T')
+        spec = spec.mean(dim=-1) # (1, n_bins)
         
-        spec_crop = spec[self.freq_mask]
-        fp = get_fakeprints(spec_crop, self.freqs)
-        return fp.unsqueeze(0)  # (1, feature_dim)
+        spec_crop = spec[:, self.mask]
+        fp = get_fakeprints(spec_crop, area=self.hull_area)  # (1, feature_dim)
+        return fp
 
 
     def forward(self, x, convolve=False):
@@ -116,6 +127,7 @@ class RobustDetector(L.LightningModule):
         self.eval()
         with torch.inference_mode():
             features = self.extract_features(waveform.to(self.linear_proj.weights.device))
+            features = features[:, self.mask]  # Apply same frequency mask as during training
             logits = self(features, convolve=convolve)
             probs = torch.sigmoid(logits)
         return probs.item()
@@ -184,12 +196,13 @@ class RobustDetector(L.LightningModule):
     
 
     def on_save_checkpoint(self, checkpoint: dict) -> None:
-        # Remove CQT transform from state dict
-        keys_to_remove = [k for k in checkpoint["state_dict"] if k.startswith("cqt_transform")]
+        # Remove transform from state dict
+        keys_to_remove = [k for k in checkpoint["state_dict"] if k.startswith("transform")]
         for k in keys_to_remove:
             del checkpoint["state_dict"][k]
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
-        cqt_state = {k: v for k, v in self.cqt_transform.state_dict().items()}
+        # Restore transform state
+        cqt_state = {k: v for k, v in self.transform.state_dict().items()}
         for k, v in cqt_state.items():
-            checkpoint["state_dict"][f"cqt_transform.{k}"] = v
+            checkpoint["state_dict"][f"transform.{k}"] = v

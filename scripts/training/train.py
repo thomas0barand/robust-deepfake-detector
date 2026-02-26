@@ -7,16 +7,15 @@ from torch.utils.data import DataLoader, random_split
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
 
-from src.models.detector import RobustDetector
-from src.data.dataset import FakeprintDataset
-from src.models.utils import get_feature_dim
+from src.models import RobustDetector
+from src.data import FakeprintDataset
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train RobustDetector")
 
-    parser.add_argument("--data_dir", type=str, default="src/checkpoints/train/")
-    parser.add_argument("--mode", type=str, default="stft", choices=["cqt", "stft"])
+    parser.add_argument("--data_dir", type=str, default="data/train/")
+    parser.add_argument("--mode", type=str, default="stft", choices=["stft", "cqt"], help="Type of time-frequency transform to use")
 
     # Dataset
     parser.add_argument("--val_split", type=float, default=0.1)
@@ -26,12 +25,13 @@ def parse_args():
     parser.add_argument("--use_norm", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--use_convolution", action=argparse.BooleanOptionalAction, default=False)
 
-    # CQT
+    # Transform
     parser.add_argument("--n_fft", type=int, default=16384)
-    parser.add_argument("--sampling_rate", type=int, default=48000)
-    parser.add_argument("--bins_per_octave", type=int, default=96)
-    parser.add_argument("--freq_range", type=int, nargs=2, default=[200, 6000], metavar=("F_MIN", "F_MAX"))
-    parser.add_argument("--f_min", type=float, default=32.7)
+    parser.add_argument("--sampling_rate", type=int, default=44100)
+    parser.add_argument("--bins_per_octave", type=int, default=192)
+    parser.add_argument("--hull_area", type=int, default=20)
+    parser.add_argument("--freq_range", type=int, nargs=2, default=[300, 10000], metavar=("F_MIN", "F_MAX"))
+    parser.add_argument("--fmin", type=float, default=32.7)
 
     # Training
     parser.add_argument("--batch_size", type=int, default=64)
@@ -44,7 +44,7 @@ def parse_args():
     # Misc
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--log_dir", type=str, default="logs")
-    parser.add_argument("--ckpt_dir", type=str, default="src/checkpoints/models/")
+    parser.add_argument("--ckpt_dir", type=str, default="checkpoints/")
 
     return parser.parse_args()
 
@@ -52,7 +52,14 @@ def parse_args():
 def train(args):
     L.seed_everything(args.seed)
 
-    dataset = FakeprintDataset(args.data_dir, mode=args.mode)
+    dataset = FakeprintDataset(
+        args.data_dir,
+        mode=args.mode,
+        freq_range=args.freq_range,
+        n_fft=args.n_fft,
+        sampling_rate=args.sampling_rate,
+        bins_per_octave=args.bins_per_octave,
+    )
 
     n_val = int(args.val_split * len(dataset))
     n_train = len(dataset) - n_val
@@ -69,25 +76,23 @@ def train(args):
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,  num_workers=args.num_workers, pin_memory=True)
     val_loader   = DataLoader(val_set,   batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
 
-    feature_dim = get_feature_dim(args.n_fft, args.sampling_rate, transform=args.mode, bins_per_octave=args.bins_per_octave, freq_range=args.freq_range, f_min=args.f_min)
-    use_cqt = (args.mode == "cqt")
-    print(f"Feature dimension: {feature_dim}")
-
     model = RobustDetector(
-        feature_dim=feature_dim,
-        use_cqt=use_cqt,
+        transform_type=args.mode,
         use_bias=args.use_bias,
         use_norm=args.use_norm,
         use_convolution=args.use_convolution,
         n_fft=args.n_fft,
         sampling_rate=args.sampling_rate,
         bins_per_octave=args.bins_per_octave,
+        hull_area=args.hull_area,
         freq_range=args.freq_range,
-        f_min=args.f_min,
+        fmin=args.fmin,
         pos_weight=pos_weight,
         lr=args.lr,
         weight_decay=args.weight_decay,
     )
+
+    print(f"Feature dimension: {model.feature_dim}")
 
     filename = f"robustdetector-{args.mode}-use_conv" if args.use_convolution else f"robustdetector-{args.mode}"
     checkpoint_cb = ModelCheckpoint(

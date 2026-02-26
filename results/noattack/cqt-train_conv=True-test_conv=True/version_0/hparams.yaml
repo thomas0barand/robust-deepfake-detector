@@ -7,7 +7,7 @@ freq_range:
 init_std: 0.02
 lr: 0.001
 n_fft: 16384
-pos_weight: 1.0059435360304816
+pos_weight: 1.001334519350237
 sampling_rate: 48000
 use_bias: true
 use_convolution: true

@@ -7,6 +7,8 @@ attack/*
 
 logs/
 lightning_logs/
+outputs/
+results/
 
 # Large files
 *.mp3
