@@ -1,2 +1,0 @@
-epoch,step,test_accuracy,test_auroc,test_f1,test_precision
-0,0,0.9989969730377197,1.0,0.9989989995956421,1.0

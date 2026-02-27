@@ -4,9 +4,13 @@ import numpy as np
 
 
 def load_audio(file_path, max_duration=None):
-    waveform, sr = librosa.load(file_path, sr=None, mono=True, duration=max_duration)
-    waveform = torch.from_numpy(waveform).unsqueeze(0)  # (1, num_samples)
-    return waveform, sr
+    try:
+        waveform, sr = librosa.load(file_path, sr=None, mono=True, duration=max_duration)
+        waveform = torch.from_numpy(waveform).unsqueeze(0)  # (1, num_samples)
+        return waveform, sr
+    except Exception as e:
+        print(f"Error loading {file_path}: {e}")
+        return None, None
 
 
 def get_spectrum(transform, waveform):

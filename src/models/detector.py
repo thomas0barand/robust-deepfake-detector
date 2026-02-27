@@ -14,12 +14,12 @@ class RobustDetector(L.LightningModule):
         self,
         # Model params
         transform_type="stft",
-        use_bias=True,
         use_norm=True,
+        use_bias=False,
         init_std=0.02,
         use_convolution=False,
         # Transform params
-        freq_range=[300, 10000],
+        freq_range=[200, 16000],
         n_fft=16384,  # 2**14
         sampling_rate=44100,
         bins_per_octave=192,
@@ -88,8 +88,8 @@ class RobustDetector(L.LightningModule):
 
         self.linear_proj = LinearProj(
             feature_dim=self.feature_dim,
-            use_bias=use_bias,
             use_norm=use_norm,
+            use_bias=use_bias,
             init_std=init_std,
         )
 

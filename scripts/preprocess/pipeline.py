@@ -85,6 +85,9 @@ def preprocess_fakeprints(
         batch_waves = []
         for path in tqdm(batch_files, leave=False, desc=f"Loading audio files for batch {i+1}/{num_batches}"):
             waveform, sr = load_audio(path, max_duration=max_duration)
+            if waveform is None:
+                continue
+            
             if manip_func is not None:
                 speed_factor = np.random.uniform(0.9, 1.1) # Random speed factor for augmentation
                 waveform = manip_func(waveform, sr, speed_factor)

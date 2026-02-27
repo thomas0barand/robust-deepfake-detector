@@ -12,7 +12,7 @@ class FakeprintDataset(Dataset):
         self,
         data_dir: str,
         mode: str = "cqt",
-        freq_range: list = [200, 10000],
+        freq_range: list = [200, 16000],
         n_fft: int = 16384,
         sampling_rate: int = 44100,
         bins_per_octave: int = 192,

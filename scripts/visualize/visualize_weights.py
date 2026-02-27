@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-from src.models.detector import RobustDetector
+from src.models import RobustDetector
 
 
 def plot_weights(
@@ -11,10 +11,10 @@ def plot_weights(
     model.eval()
 
     # Extract linear weights (1, feature_dim)
-    weights = model.linear_proj.weights.detach().cpu().numpy().squeeze()  # (feature_dim,)
-    freqs = model.freqs.detach().cpu().numpy()  # (feature_dim,)
-    mask = model.mask.cpu().numpy()  # (feature_dim_full,)
-    freqs = freqs[mask]  # (feature_dim,)
+    weights = model.linear_proj.weights.detach().cpu().numpy().squeeze()
+    freqs = model.freqs.detach().cpu().numpy()
+    mask = model.mask.cpu().numpy()
+    freqs = freqs[mask]
 
     assert len(weights) == len(freqs), f"Shape mismatch: weights {weights.shape} vs freqs {freqs.shape}"
 

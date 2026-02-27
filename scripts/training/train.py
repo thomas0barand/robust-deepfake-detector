@@ -21,8 +21,8 @@ def parse_args():
     parser.add_argument("--val_split", type=float, default=0.1)
 
     # Model
-    parser.add_argument("--use_bias", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--use_norm", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--use_bias", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--use_convolution", action=argparse.BooleanOptionalAction, default=False)
 
     # Transform
@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument("--sampling_rate", type=int, default=44100)
     parser.add_argument("--bins_per_octave", type=int, default=192)
     parser.add_argument("--hull_area", type=int, default=20)
-    parser.add_argument("--freq_range", type=int, nargs=2, default=[300, 10000], metavar=("F_MIN", "F_MAX"))
+    parser.add_argument("--freq_range", type=int, nargs=2, default=[200, 16000], metavar=("F_MIN", "F_MAX"))
     parser.add_argument("--fmin", type=float, default=32.7)
 
     # Training
@@ -78,8 +78,8 @@ def train(args):
 
     model = RobustDetector(
         transform_type=args.mode,
-        use_bias=args.use_bias,
         use_norm=args.use_norm,
+        use_bias=args.use_bias,
         use_convolution=args.use_convolution,
         n_fft=args.n_fft,
         sampling_rate=args.sampling_rate,

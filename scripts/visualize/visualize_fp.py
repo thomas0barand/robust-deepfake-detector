@@ -1,44 +1,8 @@
+import glob
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.utils.fakeprints import get_freqs, get_freqs_mask
-
-
-F_RANGE = [200, 10000]
-TRANSFORM = "cqt"
-SHOW_AI_FP = False
-
-N = 10
-
-
-ai_dir = "data/train/ai"
-human_dir = "data/train/human"
-
-
-dir_path = ai_dir if SHOW_AI_FP else human_dir
-print(f"Loading fakeprints from: {dir_path}")
-
-file = np.load(f"{dir_path}/fakeprints_01.npz")
-
-fakeprints = file[TRANSFORM]
-n_fft = file["n_fft"].item()
-sampling_rate = file["sampling_rate"].item()
-bins_per_octave = file["bins_per_octave"].item()
-f_min = file["f_min"].item()
-
-log = (TRANSFORM in ["cqt", "vqt"])
-freqs = get_freqs(
-    n_fft=n_fft,
-    sr=sampling_rate,
-    log=log,
-    bins_per_octave=bins_per_octave,
-    f_min=f_min,
-)
-
-mask = get_freqs_mask(freqs, sampling_rate, freq_range=F_RANGE)
-
-freqs = freqs[mask]
-fakeprints = fakeprints[:, mask]
+from src.utils import get_freqs, get_freqs_mask
 
 
 def plot_fp(freqs, fakeprints, log_scale=True):
@@ -54,4 +18,39 @@ def plot_fp(freqs, fakeprints, log_scale=True):
     plt.grid()
     plt.show()
 
-plot_fp(freqs, fakeprints[:N], log_scale=True)
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_dir", type=str, default="data/train/ai", help="Directory containing .npz files")
+    parser.add_argument("--transform", type=str, choices=["stft", "cqt"], default="stft", help="Transform type to visualize")
+    parser.add_argument("--freq_range", nargs=2, type=int, default=[200, 16000], help="Frequency range to plot")
+    parser.add_argument("--max_files", type=int, default=5, help="Maximum number of .npz files to show")
+    args = parser.parse_args()
+
+    file_paths = glob.glob(f"{args.data_dir}/fakeprints_*.npz")
+    file_path = np.random.choice(file_paths, size=1)[0]
+
+    print(f"Loading fakeprints from: {file_path}")
+    file = np.load(file_path)
+
+    fakeprints = file[args.transform]
+
+    n_fft = file["n_fft"].item()
+    sampling_rate = file["sampling_rate"].item()
+    bins_per_octave = file["bins_per_octave"].item()
+    log = (args.transform == "cqt")
+
+    freqs = get_freqs(
+        n_fft=n_fft,
+        sr=sampling_rate,
+        log=log,
+        bins_per_octave=bins_per_octave,
+    )
+
+    mask = get_freqs_mask(freqs, sampling_rate, freq_range=args.freq_range)
+
+    freqs = freqs[mask]
+    fakeprints = fakeprints[:, mask]
+
+    plot_fp(freqs, fakeprints[:args.max_files], log_scale=log)
