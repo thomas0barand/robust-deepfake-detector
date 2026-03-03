@@ -41,3 +41,5 @@ ouputs/figures/fakeprints_explanation.pdf
 *.run.xml
 *.bcf
 *.xdv
+
+outputs/
