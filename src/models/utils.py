@@ -95,6 +95,31 @@ def get_fakeprints(spectrum, freqs, db_range=[-80, 5]):
     return residue
 
 
+def _get_clips(waveform, max_samples, n_clips, clip_mode):
+    """Extract n_clips segments of max_samples from a waveform."""
+    total_samples = waveform.shape[-1]
+
+    if total_samples <= max_samples:
+        return [waveform]
+
+    n_available = total_samples // max_samples
+
+    if n_clips == "max":
+        n = n_available
+    else:
+        n = min(int(n_clips), n_available)
+
+    if clip_mode == "first":
+        starts = [i * max_samples for i in range(n)]
+    elif clip_mode == "last":
+        starts = [total_samples - (i + 1) * max_samples for i in reversed(range(n))]
+    else:  # random
+        indices = torch.randperm(n_available)[:n].sort().values
+        starts = (indices * max_samples).tolist()
+
+    return [waveform[..., s:s + max_samples] for s in starts]
+
+
 def preprocess_fakeprints(
     file_paths,
     n_fft=16384,
@@ -104,6 +129,9 @@ def preprocess_fakeprints(
     db_range=[-80, 5],
     f_min=32.7, # C1 note frequency
     device=torch.device("cpu"),
+    clip_duration=30.0,   # seconds, None to use full audio
+    clip_mode="random",   # "first", "last", or "random"
+    n_clips=1,            # int or "max" — number of clips per file
 ):
     assert device.type != "mps", "MPS device is not supported for this preprocessing pipeline. Please use CPU or CUDA."
 
@@ -150,26 +178,33 @@ def preprocess_fakeprints(
         except Exception as e:
             print(f"Error loading {path}: {e}")
             continue
-        
+
         if sr != sampling_rate:
             waveform = soxr.resample(waveform.T, sr, sampling_rate).T
-            waveform = torch.from_numpy(waveform).to(device)
+            waveform = torch.from_numpy(waveform)
 
-        waveform = waveform.mean(dim=0, keepdim=True).to(device)  # Convert to mono
+        if clip_duration is not None:
+            max_samples = int(clip_duration * sampling_rate)
+            clips = _get_clips(waveform, max_samples, n_clips, clip_mode)
+        else:
+            clips = [waveform]
 
-        cqt = get_spectrum(cqt_transform, waveform) # (1, n_bins, T')
-        cqt = cqt.mean(dim=-1).squeeze(0)  # (n_bins,)
+        for clip in clips:
+            clip = clip.mean(dim=0, keepdim=True).to(device)  # Convert to mono
 
-        stft = get_spectrum(stft_transform, waveform) # (1, n_bins, T')
-        stft = stft.mean(dim=-1).squeeze(0)  # (n_bins,)
-        
-        cqt_spec_crop = cqt[cqt_mask]
-        cqt_fp = get_fakeprints(cqt_spec_crop, cqt_freqs, db_range=db_range)
-        cqt_fakeprints.append(cqt_fp)
+            cqt = get_spectrum(cqt_transform, clip)  # (1, n_bins, T')
+            cqt = cqt.mean(dim=-1).squeeze(0)  # (n_bins,)
 
-        stft_spec_crop = stft[stft_mask]
-        stft_fp = get_fakeprints(stft_spec_crop, stft_freqs, db_range=db_range)
-        stft_fakeprints.append(stft_fp)
+            stft = get_spectrum(stft_transform, clip)  # (1, n_bins, T')
+            stft = stft.mean(dim=-1).squeeze(0)  # (n_bins,)
+
+            cqt_spec_crop = cqt[cqt_mask]
+            cqt_fp = get_fakeprints(cqt_spec_crop, cqt_freqs, db_range=db_range)
+            cqt_fakeprints.append(cqt_fp)
+
+            stft_spec_crop = stft[stft_mask]
+            stft_fp = get_fakeprints(stft_spec_crop, stft_freqs, db_range=db_range)
+            stft_fakeprints.append(stft_fp)
 
     cqt_fakeprints = torch.stack(cqt_fakeprints, dim=0)  # (N, freqs)
     stft_fakeprints = torch.stack(stft_fakeprints, dim=0)  # (N, freqs)

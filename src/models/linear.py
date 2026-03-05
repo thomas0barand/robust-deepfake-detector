@@ -21,16 +21,23 @@ class LinearProj(nn.Module):
 
         self.pooling = nn.AdaptiveMaxPool1d(1)
 
-    def forward(self, x, convolve=False):
+    def forward(self, x, convolve=False, return_conv=False):
 
-        x = F.rms_norm(x, normalized_shape=[self.feature_dim], eps=1e-8) if self.use_norm else x # (B, F)
+        if self.use_norm:
+            rms = x.norm(dim=-1, keepdim=True) / (self.feature_dim ** 0.5) + 1e-8
+            x = x / rms
         if convolve:
-            x = F.conv1d(x.unsqueeze(1), self.weights.unsqueeze(1), padding=self.feature_dim-1).squeeze(1) # (B, F) x (1, F) -> (B, 2F-1)
-            x = self.pooling(x) # (B, 1)
+            conv_out = F.conv1d(x.unsqueeze(1), self.weights.unsqueeze(1), padding=self.feature_dim-1).squeeze(1) # (B, F) x (1, F) -> (B, 2F-1)
+            pooled = self.pooling(conv_out) # (B, 1)
+
+            if hasattr(self, 'bias'):
+                pooled = pooled + self.bias # (B, 1)
+
+            return (pooled, conv_out) if return_conv else pooled
         else:
             x = torch.matmul(x, self.weights.T) # (B, F) x (F, 1) -> (B, 1)
 
-        if hasattr(self, 'bias'):
-            x += self.bias # (B, 1)
+            if hasattr(self, 'bias'):
+                x += self.bias # (B, 1)
 
-        return x
+            return x

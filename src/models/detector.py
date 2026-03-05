@@ -29,6 +29,13 @@ class RobustDetector(L.LightningModule):
         f_min=32.7,
         # Loss params
         pos_weight=None,
+        # Equivariance params
+        alpha_loss_weight=0.0,
+        alpha_speed_range=[0.8, 1.25],
+        alpha_std=None,
+        softmax_temperature=1.0,
+        equi_warmup_epochs=0,
+        use_adaptive_weights=False,
         # Optimizer params
         lr=1e-3,
         weight_decay=1e-5,
@@ -47,11 +54,20 @@ class RobustDetector(L.LightningModule):
         self.f_min = f_min
         self.lr = lr
         self.weight_decay = weight_decay
+        self.alpha_loss_weight = alpha_loss_weight
+        self.softmax_temperature = softmax_temperature
+        self.equi_warmup_epochs = equi_warmup_epochs
+        self.use_adaptive_weights = use_adaptive_weights
+
+        # Alpha0 range in CQT bins from speed range
+        self.alpha_min = int(np.ceil(np.log2(alpha_speed_range[0]) * bins_per_octave))
+        self.alpha_max = int(np.floor(np.log2(alpha_speed_range[1]) * bins_per_octave))
+        self.alpha_std = alpha_std if alpha_std is not None else (self.alpha_max - self.alpha_min) / 4.0
 
         hop_length = n_fft // 2
-        nyquist = sampling_rate / 2  # Maximum frequency that can be represented
-        n_octaves = np.log2(nyquist / f_min) - 0.1  # Subtract a small margin to ensure we don't exceed Nyquist
-        nbins = int(n_octaves * bins_per_octave)  # Total number of CQT bins to cover the desired frequency range
+        nyquist = sampling_rate / 2
+        n_octaves = np.log2(nyquist / f_min) - 0.1
+        nbins = int(n_octaves * bins_per_octave)
 
         self.cqt_transform = CQT(
             sr=sampling_rate,
@@ -84,6 +100,12 @@ class RobustDetector(L.LightningModule):
         # Handle class imbalance via pos_weight
         pw = torch.tensor([pos_weight]) if pos_weight is not None else None
         self.loss_fn = nn.BCEWithLogitsLoss(pos_weight=pw)
+        self.equi_loss_fn = nn.SmoothL1Loss()
+
+        # Adaptive multi-task weighting (Kendall et al.)
+        if use_adaptive_weights:
+            self.log_var_bce = nn.Parameter(torch.zeros(1))
+            self.log_var_equi = nn.Parameter(torch.zeros(1))
 
         self.auroc = AUROC(task="binary")
         self.f1 = F1Score(task="binary")
@@ -107,8 +129,35 @@ class RobustDetector(L.LightningModule):
         return fp.unsqueeze(0)  # (1, feature_dim)
 
 
-    def forward(self, x, convolve=False):
-        return self.linear_proj(x, convolve=convolve)
+    def sample_alpha0(self, batch_size, device):
+        """Truncated normal via rejection sampling — no edge spikes."""
+        alpha0 = torch.empty(batch_size)
+        remaining = torch.arange(batch_size)
+        while len(remaining) > 0:
+            candidates = torch.normal(0, self.alpha_std, size=(len(remaining),))
+            valid = (candidates >= self.alpha_min) & (candidates <= self.alpha_max)
+            alpha0[remaining[valid]] = candidates[valid]
+            remaining = remaining[~valid]
+        return alpha0.round().long().to(device)
+
+    @staticmethod
+    def shift_fakeprints(x, alpha0):
+        """Roll fakeprints by alpha0 bins with zero-fill. x: (B, F), alpha0: (B,) long tensor."""
+        B, F = x.shape
+        idx = torch.arange(F, device=x.device).unsqueeze(0)
+        src_idx = idx - alpha0.unsqueeze(1)
+        valid = (src_idx >= 0) & (src_idx < F)
+        src_idx = src_idx.clamp(0, F - 1)
+        return torch.gather(x, 1, src_idx) * valid.float()
+
+    def soft_argmax(self, x):
+        """Soft argmax over last dim. x: (B, L) -> (B,)"""
+        indices = torch.arange(x.shape[-1], device=x.device, dtype=x.dtype)
+        weights = torch.softmax(x / self.softmax_temperature, dim=-1)
+        return (weights * indices).sum(dim=-1)
+
+    def forward(self, x, convolve=False, return_conv=False):
+        return self.linear_proj(x, convolve=convolve, return_conv=return_conv)
     
 
     def predict(self, waveform, convolve=False):
@@ -120,21 +169,86 @@ class RobustDetector(L.LightningModule):
         return probs.item()
 
 
+    def _compute_equivariance_loss(self, x, y, conv_out):
+        """Invariance loss: shifted samples should keep their original label.
+        Applied to AI-only or all samples based on equi_all_classes flag.
+        Also monitors lag shift via hard argmax (non-differentiable indicator)."""
+        if not (conv_out is not None and self.alpha_loss_weight > 0):
+            return torch.tensor(0.0, device=x.device), torch.tensor(0.0, device=x.device)
+
+        alpha0 = self.sample_alpha0(x.shape[0], x.device)
+        x_shifted = self.shift_fakeprints(x, alpha0)
+        logits_shifted, conv_shifted = self(x_shifted, convolve=True, return_conv=True)
+
+        equi_loss = self.loss_fn(logits_shifted.squeeze(-1), y)
+
+        with torch.no_grad():
+            ai_mask = (y == 1)
+            if ai_mask.any():
+                lag_orig = conv_out[ai_mask].argmax(dim=-1).float()
+                lag_shifted = conv_shifted[ai_mask].argmax(dim=-1).float()
+                mean_lag_error = ((lag_shifted - lag_orig) - alpha0[ai_mask].float()).abs().mean()
+            else:
+                mean_lag_error = torch.tensor(0.0, device=x.device)
+
+        return equi_loss, mean_lag_error
+
+    def _get_equi_weight(self):
+        if self.alpha_loss_weight <= 0:
+            return 0.0
+        if self.equi_warmup_epochs <= 0:
+            return self.alpha_loss_weight
+        progress = min(self.current_epoch / self.equi_warmup_epochs, 1.0)
+        return self.alpha_loss_weight * progress
+
+    def _combine_losses(self, bce_loss, equi_loss):
+        w = self._get_equi_weight()
+        if self.use_adaptive_weights:
+            prec_bce = torch.exp(-self.log_var_bce)
+            prec_equi = torch.exp(-self.log_var_equi)
+            return 0.5 * (prec_bce * bce_loss + self.log_var_bce + prec_equi * equi_loss + self.log_var_equi)
+        return bce_loss + w * equi_loss
+
     def training_step(self, batch, batch_idx):
         x, y = batch
-        logits = self(x, convolve=self.use_convolution)
-        loss = self.loss_fn(logits.squeeze(-1), y)
+
+        if self.use_convolution:
+            logits, conv_out = self(x, convolve=True, return_conv=True)
+        else:
+            logits = self(x, convolve=False)
+            conv_out = None
+
+        bce_loss = self.loss_fn(logits.squeeze(-1), y)
+        equi_loss, mean_lag_err = self._compute_equivariance_loss(x, y, conv_out)
+        loss = self._combine_losses(bce_loss, equi_loss)
 
         self.log('train_loss', loss)
+        self.log('train_bce', bce_loss)
+        self.log('train_equi', equi_loss)
+        self.log('train_lag_mae', mean_lag_err)
+        if self.use_adaptive_weights:
+            self.log('train_w_bce', torch.exp(-self.log_var_bce))
+            self.log('train_w_equi', torch.exp(-self.log_var_equi))
         return loss
 
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        logits = self(x, convolve=self.use_convolution)
-        loss = self.loss_fn(logits.squeeze(-1), y)
+
+        if self.use_convolution:
+            logits, conv_out = self(x, convolve=True, return_conv=True)
+        else:
+            logits = self(x, convolve=False)
+            conv_out = None
+
+        bce_loss = self.loss_fn(logits.squeeze(-1), y)
+        equi_loss, mean_lag_err = self._compute_equivariance_loss(x, y, conv_out)
+        loss = self._combine_losses(bce_loss, equi_loss)
 
         self.log('val_loss', loss, prog_bar=True)
+        self.log('val_bce', bce_loss)
+        self.log('val_equi', equi_loss)
+        self.log('val_lag_mae', mean_lag_err)
         self.log('val_auroc', self.auroc(logits.squeeze(-1), y), on_epoch=True, prog_bar=True)
         self.log('val_f1', self.f1(logits.squeeze(-1), y), on_epoch=True, prog_bar=True)
         self.log('val_accuracy', self.accuracy(logits.squeeze(-1), y), on_epoch=True, prog_bar=True)

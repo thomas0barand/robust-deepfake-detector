@@ -33,6 +33,14 @@ def parse_args():
     parser.add_argument("--freq_range", type=int, nargs=2, default=[200, 6000], metavar=("F_MIN", "F_MAX"))
     parser.add_argument("--f_min", type=float, default=32.7)
 
+    # Equivariance
+    parser.add_argument("--alpha_loss_weight", type=float, default=0.0, help="Weight for equivariance loss (0 = disabled)")
+    parser.add_argument("--alpha_speed_range", type=float, nargs=2, default=[0.8, 1.25], metavar=("S_MIN", "S_MAX"))
+    parser.add_argument("--alpha_std", type=float, default=None, help="Std of Gaussian alpha0 sampling (bins). If None, derived from speed range.")
+    parser.add_argument("--softmax_temperature", type=float, default=1.0)
+    parser.add_argument("--equi_warmup_epochs", type=int, default=0, help="Epochs to linearly ramp up equivariance loss")
+    parser.add_argument("--use_adaptive_weights", action=argparse.BooleanOptionalAction, default=False)
+
     # Training
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--num_workers", type=int, default=0)
@@ -85,6 +93,12 @@ def train(args):
         freq_range=args.freq_range,
         f_min=args.f_min,
         pos_weight=pos_weight,
+        alpha_loss_weight=args.alpha_loss_weight,
+        alpha_speed_range=args.alpha_speed_range,
+        alpha_std=args.alpha_std,
+        softmax_temperature=args.softmax_temperature,
+        equi_warmup_epochs=args.equi_warmup_epochs,
+        use_adaptive_weights=args.use_adaptive_weights,
         lr=args.lr,
         weight_decay=args.weight_decay,
     )
