@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-DEFAULT_REPO_ID = "aurelvague/audio-genai"
+DEFAULT_REPO_ID = "Centrale-Lyon-Superintelligence/audio-genai"
 
 class ManifestPipeline:
     def __init__(self, default_label: str = "ai", schema_version: str = "v1") -> None:
