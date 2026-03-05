@@ -9,7 +9,6 @@ from lightning.pytorch.loggers import TensorBoardLogger
 
 from src.models.detector import RobustDetector
 from src.data.dataset import FakeprintDataset
-from src.models.utils import get_feature_dim
 
 
 def parse_args():
@@ -77,7 +76,7 @@ def train(args):
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,  num_workers=args.num_workers, pin_memory=True)
     val_loader   = DataLoader(val_set,   batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
 
-    feature_dim = get_feature_dim(args.n_fft, args.sampling_rate, transform=args.mode, bins_per_octave=args.bins_per_octave, freq_range=args.freq_range, f_min=args.f_min)
+    feature_dim = dataset.samples[0][0].shape[0]
     use_cqt = (args.mode == "cqt")
     print(f"Feature dimension: {feature_dim}")
 
