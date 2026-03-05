@@ -84,12 +84,19 @@ def get_feature_dim(n_fft, sr, transform="cqt", bins_per_octave=96, freq_range=[
 
 
 def get_fakeprints(spectrum, freqs, db_range=[-80, 5]):
-    lower_x, lower_c = lower_hull(spectrum, area=10)
+    # Interpolation uses scipy/numpy: do hull and indexing on CPU to avoid device mismatch (Colab/CUDA)
+    spectrum_cpu = spectrum.cpu()
+    freqs_cpu = freqs.cpu()
 
+    lower_x, lower_c = lower_hull(spectrum_cpu, area=10)
     low_hull_curve = torch.from_numpy(
-        interpolate.interp1d(freqs[lower_x].cpu(), lower_c.cpu(), kind='quadratic')(freqs.cpu().numpy())
+        interpolate.interp1d(
+            freqs_cpu[lower_x].numpy(),
+            lower_c.numpy(),
+            kind="quadratic",
+        )(freqs_cpu.numpy())
     ).to(dtype=spectrum.dtype, device=spectrum.device)
-    
+
     low_hull_curve = torch.clip(low_hull_curve, min=db_range[0])
     residue = torch.clip(spectrum - low_hull_curve, min=0, max=db_range[1])
     return residue
@@ -131,7 +138,7 @@ def preprocess_fakeprints(
     device=torch.device("cpu"),
     clip_duration=30.0,   # seconds, None to use full audio
     clip_mode="random",   # "first", "last", or "random"
-    n_clips=1,            # int or "max" — number of clips per file
+    n_clips=1            # int or "max" — number of clips per file
 ):
     assert device.type != "mps", "MPS device is not supported for this preprocessing pipeline. Please use CPU or CUDA."
 
