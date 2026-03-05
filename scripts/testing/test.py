@@ -3,9 +3,8 @@ import argparse
 import lightning as L
 
 from torch.utils.data import DataLoader
-from lightning.pytorch.loggers import CSVLogger
 
-from src.models import RobustDetector
+from src.models import RobustDetector, MetricsCallback
 from src.data import FakeprintDataset
 
 
@@ -44,10 +43,10 @@ def test(args):
     test_loader = DataLoader(dataset, batch_size=64, shuffle=False)
     print(f"Test samples: {len(dataset)}")
 
+    filename = f"{mode}-train_conv={train_conv}-test_conv={args.use_convolution}-no-sigmoid"
+    callback = MetricsCallback(output_dir=args.output_dir, filename=filename, threshold_metric="f1")
     
-
-    name = f"{mode}-train_conv={train_conv}-test_conv={args.use_convolution}"
-    trainer = L.Trainer(deterministic=True, logger=CSVLogger(args.output_dir, name=name))
+    trainer = L.Trainer(deterministic=True, callbacks=[callback], logger=False)
     trainer.test(model, test_loader)
 
 

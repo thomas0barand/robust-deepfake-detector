@@ -74,7 +74,7 @@ def train(args):
     print(f"Class balance — AI: {n_pos}, Human: {n_neg}, pos_weight: {pos_weight:.2f}")
 
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,  num_workers=args.num_workers, pin_memory=True)
-    val_loader   = DataLoader(val_set,   batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
 
     model = RobustDetector(
         transform_type=args.mode,
@@ -94,17 +94,19 @@ def train(args):
 
     print(f"Feature dimension: {model.feature_dim}")
 
-    filename = f"robustdetector-{args.mode}-use_conv" if args.use_convolution else f"robustdetector-{args.mode}"
+    filename = f"robustdetector-{args.mode}"
+    filename += "-use_conv" if args.use_convolution else ""
+
     checkpoint_cb = ModelCheckpoint(
         dirpath=args.ckpt_dir,
         filename=filename,
-        monitor="val_auroc",
+        monitor="val_f1",
         mode="max",
         save_top_k=1,
         save_last=False,
     )
     early_stop_cb = EarlyStopping(
-        monitor="val_auroc",
+        monitor="val_f1",
         mode="max",
         patience=args.patience,
         verbose=True,
@@ -122,7 +124,7 @@ def train(args):
 
     trainer.fit(model, train_loader, val_loader)
 
-    print(f"Best model: {checkpoint_cb.best_model_path} (val_auroc={checkpoint_cb.best_model_score:.4f})")
+    print(f"Best model: {checkpoint_cb.best_model_path} (val_f1={checkpoint_cb.best_model_score:.4f})")
     return checkpoint_cb.best_model_path
 
 
