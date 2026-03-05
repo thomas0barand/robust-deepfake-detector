@@ -5,7 +5,7 @@ attack/*
 
 __pycache__/
 
-
+data/*
 data/ai/sonics
 data/human/fma_small
 logs/
