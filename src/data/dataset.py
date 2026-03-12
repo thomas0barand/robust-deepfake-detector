@@ -2,6 +2,7 @@ import os
 import glob
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from torch.utils.data import Dataset
 from src.utils import get_freqs, get_freqs_mask
@@ -15,8 +16,15 @@ class FakeprintDataset(Dataset):
         freq_range: list = [200, 16000],
         n_fft: int = 16384,
         sampling_rate: int = 44100,
-        bins_per_octave: int = 192,
+        bins_per_octave: int = 96,
     ):
+        self.data_dir = data_dir
+        self.mode = mode
+        self.freq_range = freq_range
+        self.n_fft = n_fft
+        self.sampling_rate = sampling_rate
+        self.bins_per_octave = bins_per_octave
+
         self.samples = []  # list of (fakeprint, label)
 
         log = (mode == "cqt")
@@ -26,18 +34,30 @@ class FakeprintDataset(Dataset):
         for label, subdir in [(0, "human"), (1, "ai")]:
             npz_paths = sorted(glob.glob(os.path.join(data_dir, subdir, "*.npz")))
             for path in npz_paths:
+
                 data = np.load(path)
+
                 assert n_fft == data["n_fft"].item()
                 assert sampling_rate == data["sampling_rate"].item()
                 assert bins_per_octave == data["bins_per_octave"].item()
-                fakeprints = data[mode]  # (N, feature_dim)
-                fakeprints = fakeprints[:, mask]  # (N, feature_dim_masked)
-                for fp in fakeprints:
-                    self.samples.append((fp, label))
+
+                fakeprints = data[mode]
+                fakeprints = fakeprints[:, mask]  # (N, feature_dim)
+                speed_factors = data.get("speed_factors", [1.0])  # Optional speed factors for augmentation
+
+                for fp, speed_factor in zip(fakeprints, speed_factors):
+                    
+                    self.samples.append((fp, label, speed_factor))
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        fp, label = self.samples[idx]
-        return torch.from_numpy(fp).float(), torch.tensor(label).float()
+        fp, label, speed_factor = self.samples[idx]
+        if label == 1:  # AI-generated sample
+            bin_shift = int(np.round(np.log2(speed_factor) * self.bins_per_octave))
+            lag_index = (len(fp) // 2) + bin_shift
+            lag = F.one_hot(torch.tensor(lag_index), num_classes=len(fp)).float()  # (feature_dim,)
+        else:
+            lag = (1/len(fp)) * torch.ones(len(fp))  # (feature_dim,)
+        return torch.from_numpy(fp).float(), torch.tensor(label).float(), lag

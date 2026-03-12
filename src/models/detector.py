@@ -2,6 +2,7 @@ import torch
 
 import torch.nn as nn
 import lightning as L
+import torch.nn.functional as F
 
 from nnAudio.features import STFT, CQT
 from torchmetrics import AUROC, F1Score, Precision, Accuracy
@@ -22,7 +23,7 @@ class RobustDetector(L.LightningModule):
         freq_range=[200, 16000],
         n_fft=16384,  # 2**14
         sampling_rate=44100,
-        bins_per_octave=192,
+        bins_per_octave=96,
         hull_area=20,
         fmin=32.7,
         # Loss params
@@ -95,7 +96,7 @@ class RobustDetector(L.LightningModule):
 
         # Handle class imbalance via pos_weight
         pw = torch.tensor([pos_weight]) if pos_weight is not None else None
-        self.loss_fn = nn.BCEWithLogitsLoss(pos_weight=pw)
+        self.bce_loss = nn.BCEWithLogitsLoss(pos_weight=pw)
 
         self.auroc = AUROC(task="binary")
         self.f1 = F1Score(task="binary")
@@ -128,31 +129,52 @@ class RobustDetector(L.LightningModule):
         with torch.inference_mode():
             features = self.extract_features(waveform.to(self.linear_proj.weights.device))
             features = features[:, self.mask]  # Apply same frequency mask as during training
-            logits = self(features, convolve=convolve)
+            logits, _ = self(features, convolve=convolve)
             probs = torch.sigmoid(logits)
         return probs.item()
 
 
     def training_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x, convolve=self.use_convolution)
-        loss = self.loss_fn(logits.squeeze(-1), y)
+        fp, label, lag = batch
+        logits, cross_corr = self(fp, convolve=self.use_convolution)
+        class_loss = self.bce_loss(logits.squeeze(-1), label)
+        if self.use_convolution:
+            
+
+            reg_loss = F.cross_entropy(cross_corr, lag)
+            loss = class_loss
+        else:
+            loss = class_loss
 
         self.log('train_loss', loss)
+        if self.use_convolution:
+            self.log('train_class_loss', class_loss)
+            self.log('train_reg_loss', reg_loss)
         return loss
 
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x, convolve=self.use_convolution)
+        fp, label, lag = batch
+        logits, cross_corr = self(fp, convolve=self.use_convolution)
+        
+        class_loss = self.bce_loss(logits.squeeze(-1), label)
+        if self.use_convolution:
+            reg_loss = F.cross_entropy(cross_corr, lag)
+            loss = class_loss + 0.1 * reg_loss
+        else:
+            loss = class_loss
+        
         preds = torch.sigmoid(logits).squeeze(-1)
-        loss = self.loss_fn(logits.squeeze(-1), y)
+        self.auroc.update(preds, label.long())
+        self.f1.update(preds, label.long())
+        self.precision.update(preds, label.long())
+        self.accuracy.update(preds, label.long())
 
         self.log('val_loss', loss, prog_bar=True)
-        self.auroc.update(preds, y.long())
-        self.f1.update(preds, y.long())
-        self.precision.update(preds, y.long())
-        self.accuracy.update(preds, y.long())
+        if self.use_convolution:
+            self.log('val_class_loss', class_loss, prog_bar=True)
+            self.log('val_reg_loss', reg_loss, prog_bar=True)
+        return loss
 
 
     def on_validation_epoch_end(self):
@@ -168,14 +190,14 @@ class RobustDetector(L.LightningModule):
  
 
     def test_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x, convolve=self.use_convolution)
+        fp, label, lag = batch
+        logits, _ = self(fp, convolve=self.use_convolution)
         preds = torch.sigmoid(logits).squeeze(-1)
 
-        self.auroc.update(preds, y.long())
-        self.f1.update(preds, y.long())
-        self.precision.update(preds, y.long())
-        self.accuracy.update(preds, y.long())
+        self.auroc.update(preds, label.long())
+        self.f1.update(preds, label.long())
+        self.precision.update(preds, label.long())
+        self.accuracy.update(preds, label.long())
 
 
     def on_test_epoch_end(self):

@@ -18,19 +18,25 @@ class LinearProj(nn.Module):
         self.weights = nn.Parameter(torch.randn(1, feature_dim) * init_std)
         if use_bias:
             self.bias = nn.Parameter(torch.zeros(1))
-
-        self.pooling = nn.AdaptiveMaxPool1d(1)
+        else:
+            self.register_parameter('bias', None)
 
     def forward(self, x, convolve=False):
+        
+        if self.use_norm:
+            x = F.normalize(torch.clip(x, min=None, max=8), dim=-1)  # (B, F)
+            weights = F.normalize(self.weights, dim=-1)  # (1, F)
 
-        x = F.rms_norm(x, normalized_shape=[self.feature_dim], eps=1e-8) if self.use_norm else x # (B, F)
         if convolve:
-            x = F.conv1d(x.unsqueeze(1), self.weights.unsqueeze(1), padding=self.feature_dim-1).squeeze(1) # (B, F) x (1, F) -> (B, 2F-1)
-            x = self.pooling(x) # (B, 1)
+            x_conv = x.unsqueeze(1)  # (B, 1, F)
+            w_conv = weights.unsqueeze(1)  # (1, 1, F)
+            cross_corr = F.conv1d(x_conv, w_conv, padding="same").squeeze(1) # (B, 1, F) x (1, 1, F) -> (B, F)
+            logits, _ = torch.max(cross_corr, dim=1)  # (B, F) -> (B, 1)
         else:
-            x = torch.matmul(x, self.weights.T) # (B, F) x (F, 1) -> (B, 1)
+            logits = torch.matmul(x, self.weights.T) # (B, F) x (F, 1) -> (B, 1)
+            cross_corr = None
+        
+        if self.bias is not None:
+            logits = logits + self.bias # (B, 1)
 
-        if hasattr(self, 'bias'):
-            x += self.bias # (B, 1)
-
-        return x
+        return logits, cross_corr

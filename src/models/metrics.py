@@ -16,10 +16,10 @@ class MetricsCallback(L.Callback):
         self._preds, self._labels = [], []
 
     def _collect(self, pl_module, batch):
-        x, y = batch
+        x, y, lag = batch
         with torch.inference_mode():
-            #preds = torch.sigmoid(pl_module(x.to(pl_module.device), convolve=pl_module.use_convolution)).squeeze(-1)
-            preds = pl_module(x.to(pl_module.device), convolve=pl_module.use_convolution).squeeze(-1)
+            logits, cross_corr = pl_module(x.to(pl_module.device), convolve=pl_module.use_convolution)
+            preds = torch.sigmoid(logits).squeeze(-1)
         self._preds.append(preds.cpu())
         self._labels.append(y.cpu())
 

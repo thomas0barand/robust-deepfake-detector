@@ -28,7 +28,7 @@ def parse_args():
     # Transform
     parser.add_argument("--n_fft", type=int, default=16384)
     parser.add_argument("--sampling_rate", type=int, default=44100)
-    parser.add_argument("--bins_per_octave", type=int, default=192)
+    parser.add_argument("--bins_per_octave", type=int, default=96)
     parser.add_argument("--hull_area", type=int, default=20)
     parser.add_argument("--freq_range", type=int, nargs=2, default=[200, 16000], metavar=("F_MIN", "F_MAX"))
     parser.add_argument("--fmin", type=float, default=32.7)

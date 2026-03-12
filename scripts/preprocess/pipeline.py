@@ -11,7 +11,7 @@ import numpy as np
 from nnAudio.features import STFT, CQT
 from tqdm import tqdm, trange
 
-from src.utils import load_audio, get_spectrum, get_fakeprints
+from src.utils import load_audio, speed_up, get_spectrum, get_fakeprints
 
 
 def parse_args():
@@ -26,9 +26,10 @@ def parse_args():
     parser.add_argument("--num_shards", type=int, default=None, help="Total number of shards to process (for resuming)")
     parser.add_argument("--n_fft", type=int, default=16384, help="FFT size")
     parser.add_argument("--sampling_rate", type=int, default=44100, help="Target sampling rate for audio")
-    parser.add_argument("--bins_per_octave", type=int, default=192, help="Number of CQT bins per octave")
+    parser.add_argument("--bins_per_octave", type=int, default=96, help="Number of CQT bins per octave")
     parser.add_argument("--hull_area", type=int, default=20, help="Area parameter for lower hull in fakeprint extraction")
     parser.add_argument("--fmin", type=float, default=32.7, help="Minimum frequency for transforms (default is C1 note)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--device", type=str, default="cpu", help="Device to use for processing (e.g. 'cpu', 'mps' or 'cuda')")
     return parser.parse_args()
 
@@ -42,27 +43,16 @@ def is_valid_mp3(file_path):
         return False
 
 
-def speed_up(waveform, sr, speed_factor):
-    if speed_factor == 1.0:
-        return waveform
-    
-    device = waveform.device
-    new_sr = int(sr * speed_factor)
-    resampled_waveform = soxr.resample(waveform.cpu().T, sr, new_sr, quality="VHQ").T
-
-    return torch.from_numpy(resampled_waveform).to(device)
-
-
 def preprocess_fakeprints(
     file_paths,
     stft_transform,
     cqt_transform,
     batch_size=16,
     max_duration=60.0,
-    manip_func=None,
+    speed_factor="discrete",
     n_fft=16384,
     sampling_rate=44100,
-    bins_per_octave=192,
+    bins_per_octave=96,
     hull_area=20,
     device=torch.device("cpu"),
 ):
@@ -88,9 +78,11 @@ def preprocess_fakeprints(
             if waveform is None:
                 continue
             
-            if manip_func is not None:
-                speed_factor = np.random.uniform(0.9, 1.1) # Random speed factor for augmentation
-                waveform = manip_func(waveform, sr, speed_factor)
+            if speed_factor == "discrete":
+                bin_shifts = torch.arange(-30, 30)
+                discrete_sf = 2 ** (bin_shifts / bins_per_octave)
+                speed_factor = np.random.choice(discrete_sf) # Discrete speed factors for augmentation
+                waveform = speed_up(waveform, sr, speed_factor)
                 speed_factors.append(speed_factor)
             else:
                 speed_factors.append(1.0)
@@ -145,7 +137,7 @@ def pipeline(
     out_dir,
     batch_size=16,
     max_duration=60.0,
-    manip_func=None,
+    speed_factor="discrete",
     shard_size=500,
     shard_start=0,
     num_shards=None,
@@ -194,7 +186,7 @@ def pipeline(
             cqt_transform=cqt_transform,
             batch_size=batch_size,
             max_duration=max_duration,
-            manip_func=manip_func,
+            speed_factor=speed_factor,
             n_fft=n_fft,
             sampling_rate=sampling_rate,
             bins_per_octave=bins_per_octave,
@@ -206,13 +198,16 @@ def pipeline(
 
 if __name__ == "__main__":
     args = parse_args()
-    manip_func = speed_up if args.speed_up else None
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    
+    speed_factor = "discrete" if args.speed_up else None
     pipeline(
         args.data_dir,
         args.out_dir,
         batch_size=args.batch_size,
         max_duration=args.max_duration,
-        manip_func=manip_func,
+        speed_factor=speed_factor,
         shard_size=args.shard_size,
         shard_start=args.shard_start,
         num_shards=args.num_shards,
