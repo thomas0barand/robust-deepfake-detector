@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 
 from src.models import RobustDetector
+from src.utils import get_freqs, get_freqs_mask
 
 
 def plot_weights(
@@ -12,9 +13,19 @@ def plot_weights(
 
     # Extract linear weights (1, feature_dim)
     weights = model.linear_proj.weights.detach().cpu().numpy().squeeze()
-    freqs = model.freqs.detach().cpu().numpy()
-    mask = model.mask.cpu().numpy()
-    freqs = freqs[mask]
+
+    if model.transform_type == "stft" and model.log_stft:
+        freqs = get_freqs(
+            n_fft=model.n_fft,
+            sr=model.sampling_rate,
+            log=True,
+            bins_per_octave=model.bins_per_octave_stft,
+            fmin=model.fmin
+        )
+        mask = get_freqs_mask(freqs, model.sampling_rate, freq_range=model.freq_range)
+        freqs = freqs[mask].cpu().numpy()
+    else:
+        freqs = model.freqs[model.mask].cpu().numpy()
 
     assert len(weights) == len(freqs), f"Shape mismatch: weights {weights.shape} vs freqs {freqs.shape}"
 
@@ -25,7 +36,7 @@ def plot_weights(
     plt.ylabel('Weight Value')
     plt.title('Logistic Regression Weights vs Frequency (positive = AI indicator, negative = Human indicator)')
     plt.grid(alpha=0.3)
-    if model.transform_type == "cqt":
+    if model.transform_type == "cqt" or (model.transform_type == "stft" and model.log_stft):
         plt.xscale('log')
     plt.tight_layout()
 

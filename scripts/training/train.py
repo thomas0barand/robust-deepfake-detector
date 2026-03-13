@@ -29,9 +29,11 @@ def parse_args():
     parser.add_argument("--n_fft", type=int, default=16384)
     parser.add_argument("--sampling_rate", type=int, default=44100)
     parser.add_argument("--bins_per_octave", type=int, default=96)
+    parser.add_argument("--bins_per_octave_stft", type=int, default=1920)
     parser.add_argument("--hull_area", type=int, default=20)
     parser.add_argument("--freq_range", type=int, nargs=2, default=[5000, 16000], metavar=("F_MIN", "F_MAX"))
     parser.add_argument("--fmin", type=float, default=32.7)
+    parser.add_argument("--log_stft", action=argparse.BooleanOptionalAction, default=False, help="Whether to convert STFT features to log-frequency scale")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=64)
@@ -85,9 +87,11 @@ def train(args):
         n_fft=args.n_fft,
         sampling_rate=args.sampling_rate,
         bins_per_octave=args.bins_per_octave,
+        bins_per_octave_stft=args.bins_per_octave_stft,
         hull_area=args.hull_area,
         freq_range=args.freq_range,
         fmin=args.fmin,
+        log_stft=args.log_stft,
         pos_weight=pos_weight,
         lamb=args.lamb,
         lr=args.lr,
@@ -96,7 +100,7 @@ def train(args):
 
     print(f"Feature dimension: {model.feature_dim}")
 
-    filename = f"robustdetector-{args.mode}"
+    filename = f"robustdetector-{"log_stft" if args.log_stft else args.mode}"
     filename += "-use_conv" if args.use_convolution else ""
 
     checkpoint_cb = ModelCheckpoint(

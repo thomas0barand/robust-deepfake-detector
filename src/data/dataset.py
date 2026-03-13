@@ -13,7 +13,7 @@ class FakeprintDataset(Dataset):
         self,
         data_dir: str,
         mode: str = "cqt",
-        freq_range: list = [200, 16000],
+        freq_range: list = [5000, 16000],
         n_fft: int = 16384,
         sampling_rate: int = 44100,
         bins_per_octave: int = 96,
@@ -54,6 +54,4 @@ class FakeprintDataset(Dataset):
 
     def __getitem__(self, idx):
         fp, label, speed_factor = self.samples[idx]
-        bin_shift = int(np.round(np.log2(speed_factor) * self.bins_per_octave))
-        lag_index = (len(fp) // 2) + bin_shift
-        return torch.from_numpy(fp).float(), torch.tensor(label).float(), torch.tensor(lag_index).float()
+        return torch.from_numpy(fp).float(), torch.tensor(label).float(), torch.tensor(speed_factor).float()

@@ -43,7 +43,7 @@ def test(args):
     test_loader = DataLoader(dataset, batch_size=64, shuffle=False)
     print(f"Test samples: {len(dataset)}")
 
-    filename = f"{mode}-train_conv={train_conv}-test_conv={args.use_convolution}-no-sigmoid"
+    filename = f"{"log_stft" if model.log_stft else mode}-train_conv={train_conv}-test_conv={args.use_convolution}"
     callback = MetricsCallback(output_dir=args.output_dir, filename=filename, threshold_metric="f1")
     
     trainer = L.Trainer(deterministic=True, callbacks=[callback], logger=False)

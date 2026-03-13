@@ -18,6 +18,8 @@ class MetricsCallback(L.Callback):
     def _collect(self, pl_module, batch):
         x, y, lag = batch
         with torch.inference_mode():
+            if pl_module.transform_type == "stft" and pl_module.log_stft:
+                x = pl_module.stft_to_log(x)
             logits, cross_corr = pl_module(x.to(pl_module.device), convolve=pl_module.use_convolution)
             preds = torch.sigmoid(logits).squeeze(-1)
         self._preds.append(preds.cpu())
