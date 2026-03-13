@@ -20,7 +20,7 @@ class RobustDetector(L.LightningModule):
         init_std=0.02,
         use_convolution=False,
         # Transform params
-        freq_range=[200, 16000],
+        freq_range=[500, 16000],
         n_fft=16384,  # 2**14
         sampling_rate=44100,
         bins_per_octave=96,
@@ -28,6 +28,7 @@ class RobustDetector(L.LightningModule):
         fmin=32.7,
         # Loss params
         pos_weight=None,
+        lamb=0.1,
         # Optimizer params
         lr=1e-3,
         weight_decay=1e-5,
@@ -44,6 +45,7 @@ class RobustDetector(L.LightningModule):
         self.bins_per_octave = bins_per_octave
         self.hull_area = hull_area
         self.fmin = fmin
+        self.lamb = lamb
         self.lr = lr
         self.weight_decay = weight_decay
 
@@ -135,45 +137,46 @@ class RobustDetector(L.LightningModule):
 
 
     def training_step(self, batch, batch_idx):
-        fp, label, lag = batch
+        fp, label, lag_idx = batch
         logits, cross_corr = self(fp, convolve=self.use_convolution)
-        class_loss = self.bce_loss(logits.squeeze(-1), label)
-        if self.use_convolution:
-            
 
-            reg_loss = F.cross_entropy(cross_corr, lag)
-            loss = class_loss
+        class_loss = self.bce_loss(logits.squeeze(-1), label)
+
+        if self.use_convolution:
+            mask = label == 1
+            reg_loss = F.cross_entropy(cross_corr[mask], lag_idx[mask].long())
+            loss = class_loss + self.lamb * reg_loss
+            self.log('train_class_loss', class_loss)
+            self.log('train_reg_loss', reg_loss)
         else:
             loss = class_loss
 
         self.log('train_loss', loss)
-        if self.use_convolution:
-            self.log('train_class_loss', class_loss)
-            self.log('train_reg_loss', reg_loss)
         return loss
 
 
     def validation_step(self, batch, batch_idx):
-        fp, label, lag = batch
+        fp, label, lag_idx = batch
         logits, cross_corr = self(fp, convolve=self.use_convolution)
+        probs = torch.sigmoid(logits).squeeze(-1)
         
         class_loss = self.bce_loss(logits.squeeze(-1), label)
+
         if self.use_convolution:
-            reg_loss = F.cross_entropy(cross_corr, lag)
-            loss = class_loss + 0.1 * reg_loss
+            mask = label == 1
+            reg_loss = F.cross_entropy(cross_corr[mask], lag_idx[mask].long())
+            loss = class_loss + self.lamb * reg_loss
+            self.log('val_class_loss', class_loss)
+            self.log('val_reg_loss', reg_loss)
         else:
             loss = class_loss
-        
-        preds = torch.sigmoid(logits).squeeze(-1)
-        self.auroc.update(preds, label.long())
-        self.f1.update(preds, label.long())
-        self.precision.update(preds, label.long())
-        self.accuracy.update(preds, label.long())
+
+        self.auroc.update(probs, label.long())
+        self.f1.update(probs, label.long())
+        self.precision.update(probs, label.long())
+        self.accuracy.update(probs, label.long())
 
         self.log('val_loss', loss, prog_bar=True)
-        if self.use_convolution:
-            self.log('val_class_loss', class_loss, prog_bar=True)
-            self.log('val_reg_loss', reg_loss, prog_bar=True)
         return loss
 
 
@@ -190,14 +193,14 @@ class RobustDetector(L.LightningModule):
  
 
     def test_step(self, batch, batch_idx):
-        fp, label, lag = batch
-        logits, _ = self(fp, convolve=self.use_convolution)
-        preds = torch.sigmoid(logits).squeeze(-1)
+        fp, label, lag_idx = batch
+        logits, cross_corr = self(fp, convolve=self.use_convolution)
+        probs = torch.sigmoid(logits).squeeze(-1)
 
-        self.auroc.update(preds, label.long())
-        self.f1.update(preds, label.long())
-        self.precision.update(preds, label.long())
-        self.accuracy.update(preds, label.long())
+        self.auroc.update(probs, label.long())
+        self.f1.update(probs, label.long())
+        self.precision.update(probs, label.long())
+        self.accuracy.update(probs, label.long())
 
 
     def on_test_epoch_end(self):

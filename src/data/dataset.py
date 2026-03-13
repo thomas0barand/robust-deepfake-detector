@@ -54,10 +54,6 @@ class FakeprintDataset(Dataset):
 
     def __getitem__(self, idx):
         fp, label, speed_factor = self.samples[idx]
-        if label == 1:  # AI-generated sample
-            bin_shift = int(np.round(np.log2(speed_factor) * self.bins_per_octave))
-            lag_index = (len(fp) // 2) + bin_shift
-            lag = F.one_hot(torch.tensor(lag_index), num_classes=len(fp)).float()  # (feature_dim,)
-        else:
-            lag = (1/len(fp)) * torch.ones(len(fp))  # (feature_dim,)
-        return torch.from_numpy(fp).float(), torch.tensor(label).float(), lag
+        bin_shift = int(np.round(np.log2(speed_factor) * self.bins_per_octave))
+        lag_index = (len(fp) // 2) + bin_shift
+        return torch.from_numpy(fp).float(), torch.tensor(label).float(), torch.tensor(lag_index).float()

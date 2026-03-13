@@ -14,7 +14,7 @@ from src.data import FakeprintDataset
 def parse_args():
     parser = argparse.ArgumentParser(description="Train RobustDetector")
 
-    parser.add_argument("--data_dir", type=str, default="data/train/")
+    parser.add_argument("--data_dir", type=str, default="data/train/attack/", help="Directory containing training fakeprint data")
     parser.add_argument("--mode", type=str, default="stft", choices=["stft", "cqt"], help="Type of time-frequency transform to use")
 
     # Dataset
@@ -30,20 +30,21 @@ def parse_args():
     parser.add_argument("--sampling_rate", type=int, default=44100)
     parser.add_argument("--bins_per_octave", type=int, default=96)
     parser.add_argument("--hull_area", type=int, default=20)
-    parser.add_argument("--freq_range", type=int, nargs=2, default=[200, 16000], metavar=("F_MIN", "F_MAX"))
+    parser.add_argument("--freq_range", type=int, nargs=2, default=[5000, 16000], metavar=("F_MIN", "F_MAX"))
     parser.add_argument("--fmin", type=float, default=32.7)
 
     # Training
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--lamb", type=float, default=0.1)
     parser.add_argument("--weight_decay", type=float, default=1e-5)
     parser.add_argument("--max_epochs", type=int, default=50)
     parser.add_argument("--patience", type=int, default=5)
 
     # Misc
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--log_dir", type=str, default="logs")
+    parser.add_argument("--log_dir", type=str, default="logs/")
     parser.add_argument("--ckpt_dir", type=str, default="checkpoints/")
 
     return parser.parse_args()
@@ -88,6 +89,7 @@ def train(args):
         freq_range=args.freq_range,
         fmin=args.fmin,
         pos_weight=pos_weight,
+        lamb=args.lamb,
         lr=args.lr,
         weight_decay=args.weight_decay,
     )

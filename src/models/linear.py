@@ -22,10 +22,8 @@ class LinearProj(nn.Module):
             self.register_parameter('bias', None)
 
     def forward(self, x, convolve=False):
-        
-        if self.use_norm:
-            x = F.normalize(torch.clip(x, min=None, max=8), dim=-1)  # (B, F)
-            weights = F.normalize(self.weights, dim=-1)  # (1, F)
+        x = F.normalize(torch.clamp(x, max=8), dim=-1) if self.use_norm else x
+        weights = F.normalize(self.weights, dim=-1) if self.use_norm else self.weights
 
         if convolve:
             x_conv = x.unsqueeze(1)  # (B, 1, F)
