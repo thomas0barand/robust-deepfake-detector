@@ -33,7 +33,7 @@ def get_spectrum(transform, waveform):
     return spec
 
 
-def get_freqs(n_fft, sr, log=True, bins_per_octave=96, fmin=32.7):
+def get_freqs(n_fft, sr, log=True, bins_per_octave=192, fmin=32.7):
     if log:
         nyquist = sr / 2
         n_octaves = np.log2(nyquist / fmin)

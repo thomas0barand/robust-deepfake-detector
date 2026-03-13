@@ -16,7 +16,7 @@ class FakeprintDataset(Dataset):
         freq_range: list = [5000, 16000],
         n_fft: int = 16384,
         sampling_rate: int = 44100,
-        bins_per_octave: int = 96,
+        bins_per_octave: int = 192,
     ):
         self.data_dir = data_dir
         self.mode = mode

@@ -14,7 +14,7 @@ from src.data import FakeprintDataset
 def parse_args():
     parser = argparse.ArgumentParser(description="Train RobustDetector")
 
-    parser.add_argument("--data_dir", type=str, default="data/train/attack/", help="Directory containing training fakeprint data")
+    parser.add_argument("--data_dir", type=str, default="data/train/noattack/", help="Directory containing training fakeprint data")
     parser.add_argument("--mode", type=str, default="stft", choices=["stft", "cqt"], help="Type of time-frequency transform to use")
 
     # Dataset
@@ -28,7 +28,7 @@ def parse_args():
     # Transform
     parser.add_argument("--n_fft", type=int, default=16384)
     parser.add_argument("--sampling_rate", type=int, default=44100)
-    parser.add_argument("--bins_per_octave", type=int, default=96)
+    parser.add_argument("--bins_per_octave", type=int, default=192)
     parser.add_argument("--bins_per_octave_stft", type=int, default=1920)
     parser.add_argument("--hull_area", type=int, default=20)
     parser.add_argument("--freq_range", type=int, nargs=2, default=[5000, 16000], metavar=("F_MIN", "F_MAX"))
@@ -47,7 +47,7 @@ def parse_args():
     # Misc
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--log_dir", type=str, default="logs/")
-    parser.add_argument("--ckpt_dir", type=str, default="checkpoints/")
+    parser.add_argument("--ckpt_dir", type=str, default="checkpoints/noattack/")
 
     return parser.parse_args()
 

@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument("--num_shards", type=int, default=None, help="Total number of shards to process (for resuming)")
     parser.add_argument("--n_fft", type=int, default=16384, help="FFT size")
     parser.add_argument("--sampling_rate", type=int, default=44100, help="Target sampling rate for audio")
-    parser.add_argument("--bins_per_octave", type=int, default=96, help="Number of CQT bins per octave")
+    parser.add_argument("--bins_per_octave", type=int, default=192, help="Number of CQT bins per octave")
     parser.add_argument("--hull_area", type=int, default=20, help="Area parameter for lower hull in fakeprint extraction")
     parser.add_argument("--fmin", type=float, default=32.7, help="Minimum frequency for transforms (default is C1 note)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
@@ -49,10 +49,10 @@ def preprocess_fakeprints(
     cqt_transform,
     batch_size=16,
     max_duration=60.0,
-    speed_factor="discrete",
+    apply_speed_up=True,
     n_fft=16384,
     sampling_rate=44100,
-    bins_per_octave=96,
+    bins_per_octave=192,
     hull_area=20,
     device=torch.device("cpu"),
 ):
@@ -78,8 +78,8 @@ def preprocess_fakeprints(
             if waveform is None:
                 continue
             
-            if speed_factor == "discrete":
-                bin_shifts = torch.arange(-30, 30)
+            if apply_speed_up:
+                bin_shifts = np.arange(-40, 40)
                 discrete_sf = 2 ** (bin_shifts / bins_per_octave)
                 speed_factor = np.random.choice(discrete_sf) # Discrete speed factors for augmentation
                 waveform = speed_up(waveform, sr, speed_factor)
@@ -137,7 +137,7 @@ def pipeline(
     out_dir,
     batch_size=16,
     max_duration=60.0,
-    speed_factor="discrete",
+    apply_speed_up=True,
     shard_size=500,
     shard_start=0,
     num_shards=None,
@@ -186,7 +186,7 @@ def pipeline(
             cqt_transform=cqt_transform,
             batch_size=batch_size,
             max_duration=max_duration,
-            speed_factor=speed_factor,
+            apply_speed_up=apply_speed_up,
             n_fft=n_fft,
             sampling_rate=sampling_rate,
             bins_per_octave=bins_per_octave,
@@ -201,13 +201,12 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     
-    speed_factor = "discrete" if args.speed_up else None
     pipeline(
         args.data_dir,
         args.out_dir,
         batch_size=args.batch_size,
         max_duration=args.max_duration,
-        speed_factor=speed_factor,
+        apply_speed_up=args.speed_up,
         shard_size=args.shard_size,
         shard_start=args.shard_start,
         num_shards=args.num_shards,
