@@ -14,7 +14,6 @@ def parse_args():
     parser.add_argument("--data_dir", type=str, default="data/test/attack/", help="Directory containing test fakeprint data")
     parser.add_argument("--output_dir", type=str, default="results/attack/", help="Directory to save test results")
     parser.add_argument("--ckpt_path", type=str, required=True, help="Path to model checkpoint")
-    parser.add_argument("--use_convolution", action=argparse.BooleanOptionalAction, default=True, help="Whether to use convolution during testing")
     # Misc
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
@@ -25,16 +24,10 @@ def test(args):
 
     model = RobustDetector.load_from_checkpoint(args.ckpt_path)
     model.eval()
-
-    train_conv = model.use_convolution
-    model.use_convolution = args.use_convolution
-    mode = model.transform_type
-
-    print(f"Testing {mode} model (trained with convolution={train_conv}) on {mode} data with convolution={args.use_convolution}")
     
     dataset = FakeprintDataset(
         args.data_dir,
-        mode=mode,
+        mode=model.transform_type,
         freq_range=model.freq_range,
         n_fft=model.n_fft,
         sampling_rate=model.sampling_rate,
@@ -43,7 +36,9 @@ def test(args):
     test_loader = DataLoader(dataset, batch_size=64, shuffle=False)
     print(f"Test samples: {len(dataset)}")
 
-    filename = f"{"log_stft" if model.log_stft else mode}-train_conv={train_conv}-test_conv={args.use_convolution}"
+    filename = f"{"log_stft" if model.log_stft else model.transform_type}"
+    filename += "-use_conv" if model.use_convolution else ""
+    filename += f"-lamb={model.lamb}" if model.use_convolution else ""
     callback = MetricsCallback(output_dir=args.output_dir, filename=filename, threshold_metric="f1")
     
     trainer = L.Trainer(deterministic=True, callbacks=[callback], logger=False)

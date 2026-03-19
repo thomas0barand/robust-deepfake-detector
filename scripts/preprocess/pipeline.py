@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument("--out_dir", type=str, required=True, help="Directory to save processed fakeprint shards")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size for processing files")
     parser.add_argument("--max_duration", type=float, default=30.0, help="Maximum duration (in seconds) to load from each audio file")
-    parser.add_argument("--speed_up", action="store_true", help="Whether to apply random speed changes for data augmentation")
+    parser.add_argument("--speed_up", type=str, choices=["discrete", "continuous", "none"], default="none", help="Whether to apply random speed changes for data augmentation")
     parser.add_argument("--shard_size", type=int, default=500, help="Number of files to process per shard")
     parser.add_argument("--shard_start", type=int, default=0, help="Shard index to start from (for resuming)")
     parser.add_argument("--num_shards", type=int, default=None, help="Total number of shards to process (for resuming)")
@@ -49,7 +49,7 @@ def preprocess_fakeprints(
     cqt_transform,
     batch_size=16,
     max_duration=60.0,
-    apply_speed_up=True,
+    attack_mode=None,
     n_fft=16384,
     sampling_rate=44100,
     bins_per_octave=192,
@@ -78,10 +78,14 @@ def preprocess_fakeprints(
             if waveform is None:
                 continue
             
-            if apply_speed_up:
+            if attack_mode == "discrete":
                 bin_shifts = np.arange(-40, 40)
                 discrete_sf = 2 ** (bin_shifts / bins_per_octave)
                 speed_factor = np.random.choice(discrete_sf) # Discrete speed factors for augmentation
+                waveform = speed_up(waveform, sr, speed_factor)
+                speed_factors.append(speed_factor)
+            elif attack_mode == "continuous":
+                speed_factor = np.random.uniform(0.8, 1.25) # Continuous speed factors for augmentation
                 waveform = speed_up(waveform, sr, speed_factor)
                 speed_factors.append(speed_factor)
             else:
@@ -137,7 +141,7 @@ def pipeline(
     out_dir,
     batch_size=16,
     max_duration=60.0,
-    apply_speed_up=True,
+    attack_mode=None,
     shard_size=500,
     shard_start=0,
     num_shards=None,
@@ -186,7 +190,7 @@ def pipeline(
             cqt_transform=cqt_transform,
             batch_size=batch_size,
             max_duration=max_duration,
-            apply_speed_up=apply_speed_up,
+            attack_mode=attack_mode,
             n_fft=n_fft,
             sampling_rate=sampling_rate,
             bins_per_octave=bins_per_octave,
@@ -200,13 +204,15 @@ if __name__ == "__main__":
     args = parse_args()
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+
+    attack_mode = args.speed_up if args.speed_up != "none" else None
     
     pipeline(
         args.data_dir,
         args.out_dir,
         batch_size=args.batch_size,
         max_duration=args.max_duration,
-        apply_speed_up=args.speed_up,
+        attack_mode=attack_mode,
         shard_size=args.shard_size,
         shard_start=args.shard_start,
         num_shards=args.num_shards,

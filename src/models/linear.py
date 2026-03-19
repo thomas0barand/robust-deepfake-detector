@@ -22,12 +22,12 @@ class LinearProj(nn.Module):
             self.register_parameter('bias', None)
 
     def forward(self, x, convolve=False):
-        x = F.normalize(torch.clamp(x, max=8), dim=-1) if self.use_norm else x
-        weights = F.normalize(self.weights, dim=-1) if self.use_norm else self.weights
+        # Clamp features to prevent extreme values, then optionally normalize
+        x = F.normalize(torch.clamp(x, max=8), p=2, dim=-1) if self.use_norm else torch.clamp(x, max=8)
 
         if convolve:
             x_conv = x.unsqueeze(1)  # (B, 1, F)
-            w_conv = weights.unsqueeze(1)  # (1, 1, F)
+            w_conv = self.weights.unsqueeze(1)  # (1, 1, F)
             cross_corr = F.conv1d(x_conv, w_conv, padding="same").squeeze(1) # (B, 1, F) x (1, 1, F) -> (B, F)
             logits, _ = torch.max(cross_corr, dim=1)  # (B, F) -> (B, 1)
         else:

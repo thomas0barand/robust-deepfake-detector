@@ -125,8 +125,8 @@ class RobustDetector(L.LightningModule):
         spec = get_spectrum(self.transform, waveform) # (1, n_bins, T')
         spec = spec.mean(dim=-1) # (1, n_bins)
         
-        fp = get_fakeprints(spec, area=self.hull_area)  # (1, feature_dim)
-        fp = fp[:, self.mask]
+        fp = get_fakeprints(spec, area=self.hull_area)
+        fp = fp[:, self.mask] # (1, feature_dim)
 
         if self.transform_type == "stft" and self.log_stft:
             fp = self.stft_to_log(fp)
@@ -137,17 +137,21 @@ class RobustDetector(L.LightningModule):
     def stft_to_log(self, fp):
         freqs_crop = self.freqs[self.mask]
         n_log_bins = int(math.ceil(self.bins_per_octave_stft * math.log2(self.freq_range[1] / self.freq_range[0])))
+
+        # Create logarithmically spaced frequency bins
         log_freqs = torch.logspace(
             math.log10(self.freq_range[0]),
             math.log10(self.freq_range[1]),
             steps=n_log_bins,
         )  # (n_log_bins,)
 
+        # Interpolate the fakeprints to the logarithmic frequency bins
         freq_indices = (log_freqs - freqs_crop[0]) / (freqs_crop[1] - freqs_crop[0])
         freq_indices = freq_indices.clamp(0, len(freqs_crop) - 1).to(fp.device)
         idx_low = freq_indices.long()
         idx_high = (idx_low + 1).clamp(max=len(freqs_crop) - 1)
         alpha = (freq_indices - idx_low.float())
+
         fp_log = (1 - alpha) * fp[:, idx_low] + alpha * fp[:, idx_high]
         return fp_log
 
@@ -173,14 +177,15 @@ class RobustDetector(L.LightningModule):
             bins_per_octave = self.bins_per_octave_stft
         else:
             bins_per_octave = self.bins_per_octave
-        bin_shift = torch.round(torch.log2(su_factor) * bins_per_octave)
-        lag_index = (fp.shape[-1] // 2) + bin_shift
+        
 
         logits, cross_corr = self(fp, convolve=self.use_convolution)
         class_loss = self.bce_loss(logits.squeeze(-1), label)
 
         if self.use_convolution:
             mask = label == 1
+            bin_shift = torch.round(torch.log2(su_factor) * bins_per_octave)
+            lag_index = (fp.shape[-1] // 2) + bin_shift
             reg_loss = F.cross_entropy(cross_corr[mask], lag_index[mask].long())
             loss = class_loss + self.lamb * reg_loss
             self.log('train_class_loss', class_loss)
@@ -200,8 +205,6 @@ class RobustDetector(L.LightningModule):
             bins_per_octave = self.bins_per_octave_stft
         else:
             bins_per_octave = self.bins_per_octave
-        bin_shift = torch.round(torch.log2(su_factor) * bins_per_octave)
-        lag_index = (fp.shape[-1] // 2) + bin_shift
 
         logits, cross_corr = self(fp, convolve=self.use_convolution)
         probs = torch.sigmoid(logits).squeeze(-1)
@@ -209,6 +212,8 @@ class RobustDetector(L.LightningModule):
 
         if self.use_convolution:
             mask = label == 1
+            bin_shift = torch.round(torch.log2(su_factor) * bins_per_octave)
+            lag_index = (fp.shape[-1] // 2) + bin_shift
             reg_loss = F.cross_entropy(cross_corr[mask], lag_index[mask].long())
             loss = class_loss + self.lamb * reg_loss
             self.log('val_class_loss', class_loss)

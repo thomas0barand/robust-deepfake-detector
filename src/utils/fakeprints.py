@@ -75,7 +75,6 @@ def get_low_hull_curve(x, area=20):
     # For each bin j, find the nearest anchor to the left and right *per sample*
     # We encode anchor positions as their index, non-anchors as 0/inf, then
     # do a forward/backward cummax to propagate neighbour indices.
-
     bin_pos = torch.arange(n, device=x.device).unsqueeze(0).expand(B, -1)  # (B, n)
 
     # Left anchor index: propagate forward

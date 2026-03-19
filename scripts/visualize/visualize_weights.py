@@ -36,7 +36,7 @@ def plot_weights(
     plt.ylabel('Weight Value')
     plt.title('Logistic Regression Weights vs Frequency (positive = AI indicator, negative = Human indicator)')
     plt.grid(alpha=0.3)
-    if model.transform_type == "cqt" or (model.transform_type == "stft" and model.log_stft):
+    if model.transform_type == "cqt":
         plt.xscale('log')
     plt.tight_layout()
 

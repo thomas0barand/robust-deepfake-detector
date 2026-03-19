@@ -15,6 +15,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train RobustDetector")
 
     parser.add_argument("--data_dir", type=str, default="data/train/noattack/", help="Directory containing training fakeprint data")
+    parser.add_argument("--ckpt_dir", type=str, default="checkpoints/noattack/", help="Directory to save model checkpoints")
     parser.add_argument("--mode", type=str, default="stft", choices=["stft", "cqt"], help="Type of time-frequency transform to use")
 
     # Dataset
@@ -47,7 +48,6 @@ def parse_args():
     # Misc
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--log_dir", type=str, default="logs/")
-    parser.add_argument("--ckpt_dir", type=str, default="checkpoints/noattack/")
 
     return parser.parse_args()
 
@@ -73,7 +73,7 @@ def train(args):
     train_labels = torch.tensor([dataset.samples[i][1] for i in train_set.indices])
     n_pos = train_labels.sum().item()
     n_neg = len(train_labels) - n_pos
-    pos_weight = n_neg / (n_pos + 1e-6)
+    pos_weight = n_neg / (n_pos + 1e-8)
     print(f"Class balance — AI: {n_pos}, Human: {n_neg}, pos_weight: {pos_weight:.2f}")
 
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,  num_workers=args.num_workers, pin_memory=True)
@@ -102,6 +102,7 @@ def train(args):
 
     filename = f"robustdetector-{"log_stft" if args.log_stft else args.mode}"
     filename += "-use_conv" if args.use_convolution else ""
+    filename += f"-lamb={args.lamb}" if args.use_convolution else ""
 
     checkpoint_cb = ModelCheckpoint(
         dirpath=args.ckpt_dir,
