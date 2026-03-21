@@ -15,7 +15,7 @@ Raw Audio Dataset          Preprocessing              PyTorch Dataset
                                                    (RobustDetector module)
                                                             ↓
                                                    Best Checkpoint (.ckpt)
-                                                   monitored by val_auroc
+                                                   monitored by f1 score
 ```
 
 ### 1. Raw Dataset
@@ -42,18 +42,18 @@ To process to .mp3 files into fakeprints, run:
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
 python /scripts/preprocess/pipeline.py \
-    --data_dir data/sunov5 \
-    --output_dir data/train/ai \
-    --mode stft \
-    --n_fft 16384 \
-    --sampling_rate 44100 \
-    --bins_per_octave 192 \
+    --data_dir path/to/sunov5 \
+    --out_dir data/train/attack/ai \
+    --num_shards 10 \
+    --shard_size 500 \
+    --speed_up discrete \
 ```
 
-You will find the output fakeprints in `data/train/ai/` with both `stft` and `cqt` in a `.npz` format:
+This will save 500 fakeprints per shard, with a total of 10 shards (adjustable via `--num_shards` and `--shard_size`). The `--speed_up discrete` flag applies discrete speed changes to augment the dataset with speed variations, which can help improve model robustness.
 
+You will find the output fakeprints in `data/train/attack/ai/` with both `stft` and `cqt` in a `.npz` format:
 ```
-data/train/ai/
+data/train/attack/ai/
 ├── fakeprints_01.npz
 ├── fakeprints_02.npz
 └── ...
@@ -61,34 +61,33 @@ data/train/ai/
 
 ### 3. Dataset
 
-`FakeprintDataset` reads the preprocessed `.npz` files from the output directory and serves `(fakeprint_tensor, label)` pairs to the DataLoader. A random train/val split is applied at training time.
+`FakeprintDataset` reads the preprocessed `.npz` files from the output directory and serves `(fakeprint_tensor, label, speed_factor)` pairs to the DataLoader. A random train/val split is applied at training time.
 
 ### 4. Training
 
 `RobustDetector` is a PyTorch Lightning module wrapping the classifier. Training is managed by a `Trainer` with:
-- **ModelCheckpoint** — saves the best model by `val_auroc`
-- **EarlyStopping** — halts training if `val_auroc` stops improving
+- **ModelCheckpoint** — saves the best model by `f1_score`
+- **EarlyStopping** — halts training if `val_f1_score` stops improving
 - **TensorBoardLogger** — logs metrics to `logs/`
 
 ### 5. Checkpoint
+
 The best `.ckpt` is saved to `--ckpt_dir`. It can be used directly for inference or fine-tuning.
 
 ---
 
 ## Training
 
+To train the model with the resampled log-STFT fakeprints and convolution, run:
+
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
 python scripts/training/train.py \
     --data_dir data/train/ \
     --mode stft \
-    --batch_size 64 \
-    --max_epochs 50 \
-    --patience 5 \
-    --lr 1e-3 \
-    --weight_decay 1e-5 \
-    --log_dir logs \
-    --ckpt_dir checkpoints/
+    --use_convolution \
+    --use_bias \
+    --log_stft \
 ```
 
 ## Testing
@@ -99,7 +98,7 @@ To evaluate the best checkpoint on the test set, run:
 export PYTHONPATH=$PYTHONPATH:.
 python scripts/testing/test.py \
     --data_dir data/test/attack/ \
-    --ckpt_path checkpoints/robustdetector-stft-use_conv.ckpt \
+    --ckpt_path checkpoints/robustdetector-log_stft-use_conv.ckpt \
     --output_dir results/attack/ \
 ```
 
@@ -107,8 +106,9 @@ python scripts/testing/test.py \
 
 | Flag | Default | Description |
 |---|---|---|
-| `--data_dir` | `data/train/ai/` | Path to preprocessed `.npz` fakeprints |
+| `--data_dir` | `data/train/attack/` | Path to train dataset containing `.npz` fakeprints |
 | `--mode` | `stft` | Transform type: `stft` or `cqt` |
+| `--log_stft` | `False` | Apply log transformation to STFT |
 | `--val_split` | `0.1` | Fraction of data held out for validation |
 | `--use_convolution` / `--no-use_convolution` | `True` | Enable convolutional layers |
 | `--use_norm` / `--no-use_norm` | `True` | Enable batch normalization |
@@ -116,7 +116,8 @@ python scripts/testing/test.py \
 | `--n_fft` | `16384` | FFT size |
 | `--sampling_rate` | `44100` | Audio sample rate (Hz) |
 | `--bins_per_octave` | `192` | CQT frequency resolution (CQT mode only) |
-| `--freq_range` | `300 10000` | Frequency range in Hz, e.g. `--freq_range 300 10000` |
+| `--bins_per_octave_stft` | `1920` | log-STFT frequency resolution (STFT mode only) |
+| `--freq_range` | `5000 16000` | Frequency range in Hz, e.g. `--freq_range 5000 16000` |
 | `--batch_size` | `64` | Training batch size |
 | `--max_epochs` | `50` | Maximum training epochs |
 | `--patience` | `5` | Early stopping patience (epochs) |
