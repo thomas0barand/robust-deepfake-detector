@@ -102,6 +102,16 @@ python scripts/testing/test.py \
     --output_dir results/attack/ \
 ```
 
+## Visualization
+
+To visualize the trained weights, run:
+
+```bash
+export PYTHONPATH=$PYTHONPATH:.
+python scripts/visualization/visualize_weights.py \
+    --ckpt_path checkpoints/robustdetector-log_stft-use_conv.ckpt \
+```
+
 ### Key flags
 
 | Flag | Default | Description |
