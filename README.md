@@ -1,5 +1,9 @@
 # robust-deepfake-detector
 
+## Setup
+
+Setup a Python 3.13 virtual environment and install packages in `requirements.txt`.
+
 ## Project structure
 
 ```
