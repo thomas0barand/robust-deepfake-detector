@@ -10,8 +10,60 @@ import soxr
 import numpy as np
 import torchaudio
 import torch
+from scipy import interpolate
 
-from deezer.compute_fakeprints import open_audio_slice, fakeprint
+
+#############################
+# HELPERS FROM DEEZER RESEARCH
+##############################
+
+def _lower_hull(x, area = 10):
+    idx = []
+    hull = []
+    for i in range(len(x)-area+1):
+        patch = x[i:i+area]
+        rel_idx = np.argmin(patch)
+        abs_idx = rel_idx + i
+        if abs_idx not in idx:
+            idx.append(abs_idx)
+            hull.append(patch[rel_idx])
+
+    if idx[0] != 0:
+        idx.insert(0, 0)
+        hull.insert(0, x[0])
+    if idx[-1] != len(x)-1:
+        idx.append(len(x)-1)
+        hull.append(x[-1])
+
+    return np.array(idx), np.array(hull)
+
+def _curve_profile(x, c, f_range = [5000, 16000], min_dB = -45):
+    cutoff_idx = np.where( (f_range[0] < x) & (x < f_range[1] ))
+    x_ = x[cutoff_idx]
+    c_ = c[cutoff_idx]
+    lower_x, lower_c = _lower_hull(c_, area=10)
+
+    low_hull_curve = interpolate.interp1d(x_[ lower_x ], lower_c, kind="quadratic")(x_)
+    low_hull_curve = np.clip( low_hull_curve, min_dB, None)
+
+    return x_, np.clip( c_ - low_hull_curve, 0, None )
+
+def _max_normalise(x, max_dB = 5):
+    x = np.clip(x, 0, max_dB)
+    return x / (1e-6 + np.max(x))
+
+
+def fakeprint(stft, f_range = [0, 16000], SR = 44100):
+    fp = np.mean( stft, axis=(0, 2) )
+    X_real = np.linspace(0, SR / 2, num = len(fp) )
+    x_curve, fp_curve = _curve_profile(X_real, fp, f_range)
+    fp_curve = _max_normalise(fp_curve)
+    return fp_curve
+
+def open_audio_slice(f_path):
+    audio_raw, sr = torchaudio.load(f_path, channels_first = False)
+    audio_raw = audio_raw.numpy()
+    return audio_raw, sr
 
 # Parameters to change:
 # - FREQ: frequency of the sinusoid (Hz)

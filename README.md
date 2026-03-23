@@ -25,11 +25,6 @@ robust-deepfake-detector/
 │       └── noattack/
 │           ├── ai/
 │           └── human/
-├── deezer/
-│   ├── sonics/
-│   ├── compute_fakeprints.py
-│   ├── train_test_regressor.py
-│   └── encodec_latent_visualisation.ipynb
 ├── outputs/
 │   └── figures/
 │       └── signals/
@@ -131,7 +126,6 @@ The dataset is stored in this shared Drive folder:
 
 - **checkpoints**: Model checkpoints for attack and no-attack settings.
 - **data**: Raw and processed manifests, fakeprint datasets (train/test splits), audio files, and research signals.
-- **deezer**: Fakeprint extraction (EnCodec), dataset splits (Sonics), regressor training and evaluation; notebook for latent viz.
 - **references**: Reference code from Deezer.
 - **research**: Exploratory scripts and notebooks (cross-correlation, CQT tests, pipeline tests).
 - **scripts**: Data collection (FMA, Sonics, Suno scraping), preprocessing pipelines, attack pipelines (soxr resampling/speeding), training, testing, and visualization.
