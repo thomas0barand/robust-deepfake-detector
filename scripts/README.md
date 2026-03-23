@@ -40,7 +40,6 @@ Converts raw audio into checkerboard artifacts and saves them as compressed `.np
 
 To process to .mp3 files into fakeprints, run:
 ```bash
-export PYTHONPATH=$PYTHONPATH:.
 python /scripts/preprocess/pipeline.py \
     --data_dir path/to/sunov5 \
     --out_dir data/train/attack/ai \
@@ -89,7 +88,6 @@ The best `.ckpt` is saved to `--ckpt_dir`. It can be used directly for inference
 To train the model with the resampled log-STFT fakeprints and convolution, run:
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:.
 python scripts/training/train.py \
     --data_dir data/train/ \
     --mode stft \
@@ -103,20 +101,20 @@ python scripts/training/train.py \
 To evaluate the best checkpoint on the test set, run:
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:.
 python scripts/testing/test.py \
     --data_dir data/test/attack/ \
-    --ckpt_path checkpoints/robustdetector-log_stft-use_conv.ckpt \
+    --ckpt_path checkpoints/attack/robustdetector-log_stft-use_conv-lamb=0.1.ckpt \
     --output_dir results/attack/ \
 ```
+
+Make sure `ckpt_path` refer to an existing checkpoint.
 
 ## Visualization
 
 To visualize the trained weights, run:
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:.
-python scripts/visualization/visualize_weights.py \
+python scripts/visualize/visualize_weights.py \
     --ckpt_path checkpoints/robustdetector-log_stft-use_conv.ckpt \
 ```
 
