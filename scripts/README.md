@@ -148,11 +148,3 @@ python scripts/visualize/visualize_weights.py \
 ```bash
 tensorboard --logdir logs/
 ```
-
----
-
-## Requirements
-
-```bash
-pip install torch nnAudio lightning
-```

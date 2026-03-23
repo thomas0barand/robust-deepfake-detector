@@ -113,41 +113,6 @@ def _convert_file(
         print("  macOS: brew install ffmpeg")
         return None
 
-def get_audio_info(file_path: Union[str, Path]) -> dict:
-    """Get audio file information using FFprobe."""
-    file_path = Path(file_path)
-    
-    try:
-        cmd = [
-            'ffprobe',
-            '-v', 'quiet',
-            '-print_format', 'json',
-            '-show_format',
-            '-show_streams',
-            str(file_path)
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        import json
-        data = json.loads(result.stdout)
-        
-        audio_stream = next(
-            (s for s in data.get('streams', []) if s.get('codec_type') == 'audio'),
-            {}
-        )
-        
-        return {
-            'format': data.get('format', {}).get('format_name', 'unknown'),
-            'duration': float(data.get('format', {}).get('duration', 0)),
-            'sample_rate': int(audio_stream.get('sample_rate', 0)),
-            'channels': int(audio_stream.get('channels', 0)),
-            'codec': audio_stream.get('codec_name', 'unknown'),
-            'bitrate': int(audio_stream.get('bit_rate', 0))
-        }
-    except Exception as e:
-        print(f"Error getting audio info: {e}")
-        return {}
-
 if __name__ == '__main__':
     import sys
     
