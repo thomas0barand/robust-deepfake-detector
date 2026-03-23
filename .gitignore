@@ -1,13 +1,14 @@
-attack/*
-
 .venv/
 .DS_Store
 
 **/__pycache__/
 
+logs/
+outputs/
+results/
+
 # Large files
 *.mp3
-*.csv
 
 data/raw
 data/interim
@@ -18,9 +19,6 @@ data/processed
 .idea
 
 CLAUDE.md
-
-ouputs/figures/fakeprints_explanation.pdf
-
 
 
 # LaTeX build artifacts

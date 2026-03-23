@@ -1,0 +1,140 @@
+import argparse
+import torch
+import lightning as L
+
+from torch.utils.data import DataLoader, random_split
+
+from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
+from lightning.pytorch.loggers import TensorBoardLogger
+
+from src.models import RobustDetector
+from src.data import FakeprintDataset
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train RobustDetector")
+
+    parser.add_argument("--data_dir", type=str, default="data/train/noattack/", help="Directory containing training fakeprint data")
+    parser.add_argument("--ckpt_dir", type=str, default="checkpoints/noattack/", help="Directory to save model checkpoints")
+    parser.add_argument("--mode", type=str, default="stft", choices=["stft", "cqt"], help="Type of time-frequency transform to use")
+
+    # Dataset
+    parser.add_argument("--val_split", type=float, default=0.1)
+
+    # Model
+    parser.add_argument("--use_norm", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--use_bias", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--use_convolution", action=argparse.BooleanOptionalAction, default=False)
+
+    # Transform
+    parser.add_argument("--n_fft", type=int, default=16384)
+    parser.add_argument("--sampling_rate", type=int, default=44100)
+    parser.add_argument("--bins_per_octave", type=int, default=192)
+    parser.add_argument("--bins_per_octave_stft", type=int, default=1920)
+    parser.add_argument("--hull_area", type=int, default=20)
+    parser.add_argument("--freq_range", type=int, nargs=2, default=[5000, 16000], metavar=("F_MIN", "F_MAX"))
+    parser.add_argument("--fmin", type=float, default=32.7)
+    parser.add_argument("--log_stft", action=argparse.BooleanOptionalAction, default=False, help="Whether to convert STFT features to log-frequency scale")
+
+    # Training
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--num_workers", type=int, default=0)
+    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--lamb", type=float, default=0.1)
+    parser.add_argument("--weight_decay", type=float, default=1e-5)
+    parser.add_argument("--max_epochs", type=int, default=50)
+    parser.add_argument("--patience", type=int, default=5)
+
+    # Misc
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--log_dir", type=str, default="logs/")
+
+    return parser.parse_args()
+
+
+def train(args):
+    L.seed_everything(args.seed)
+
+    dataset = FakeprintDataset(
+        args.data_dir,
+        mode=args.mode,
+        freq_range=args.freq_range,
+        n_fft=args.n_fft,
+        sampling_rate=args.sampling_rate,
+        bins_per_octave=args.bins_per_octave,
+    )
+
+    n_val = int(args.val_split * len(dataset))
+    n_train = len(dataset) - n_val
+    train_set, val_set = random_split(dataset, [n_train, n_val])
+    print(f"Train: {len(train_set)} — Val: {len(val_set)}")
+
+    # Compute pos_weight from train set to handle class imbalance
+    train_labels = torch.tensor([dataset.samples[i][1] for i in train_set.indices])
+    n_pos = train_labels.sum().item()
+    n_neg = len(train_labels) - n_pos
+    pos_weight = n_neg / (n_pos + 1e-8)
+    print(f"Class balance — AI: {n_pos}, Human: {n_neg}, pos_weight: {pos_weight:.2f}")
+
+    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,  num_workers=args.num_workers, pin_memory=True)
+    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+
+    model = RobustDetector(
+        transform_type=args.mode,
+        use_norm=args.use_norm,
+        use_bias=args.use_bias,
+        use_convolution=args.use_convolution,
+        n_fft=args.n_fft,
+        sampling_rate=args.sampling_rate,
+        bins_per_octave=args.bins_per_octave,
+        bins_per_octave_stft=args.bins_per_octave_stft,
+        hull_area=args.hull_area,
+        freq_range=args.freq_range,
+        fmin=args.fmin,
+        log_stft=args.log_stft,
+        pos_weight=pos_weight,
+        lamb=args.lamb,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+    )
+
+    print(f"Feature dimension: {model.feature_dim}")
+
+    filename = f"robustdetector-{"log_stft" if args.log_stft else args.mode}"
+    filename += "-use_conv" if args.use_convolution else ""
+    filename += f"-lamb={args.lamb}" if args.use_convolution else ""
+
+    checkpoint_cb = ModelCheckpoint(
+        dirpath=args.ckpt_dir,
+        filename=filename,
+        monitor="val_f1",
+        mode="max",
+        save_top_k=1,
+        save_last=False,
+    )
+    early_stop_cb = EarlyStopping(
+        monitor="val_f1",
+        mode="max",
+        patience=args.patience,
+        verbose=True,
+    )
+
+    logger = TensorBoardLogger(args.log_dir, name="robustdetector")
+
+    trainer = L.Trainer(
+        max_epochs=args.max_epochs,
+        callbacks=[checkpoint_cb, early_stop_cb],
+        logger=logger,
+        log_every_n_steps=10,
+        deterministic=True,
+    )
+
+    trainer.fit(model, train_loader, val_loader)
+
+    print(f"Best model: {checkpoint_cb.best_model_path} (val_f1={checkpoint_cb.best_model_score:.4f})")
+    return checkpoint_cb.best_model_path
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    train(args)
