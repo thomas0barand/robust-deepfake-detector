@@ -29,6 +29,10 @@ robust-deepfake-detector/
     └── models/
 ```
 
+## Scripts
+
+See the [readme](/scripts/README.md) in the `scripts/` directory for details on the training, testing, and visualization scripts.
+
 ## Dataset
 
 ### Download from Google Drive (local)
