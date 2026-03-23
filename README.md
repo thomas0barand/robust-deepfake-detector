@@ -2,7 +2,13 @@
 
 ## Setup
 
-Setup a Python 3.13 virtual environment and install packages in `requirements.txt`.
+Setup a Python 3.13 virtual environment, activate it and install packages listed in `pyproject.toml`:
+
+```shell
+pip install -e .
+```
+
+To ensure reproducibility, we kept the lockfile `requirements.lock` with all the pinned dependencies.
 
 ## Project structure
 
