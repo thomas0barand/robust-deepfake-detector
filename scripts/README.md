@@ -49,7 +49,15 @@ python /scripts/preprocess/pipeline.py \
     --speed_up discrete \
 ```
 
-This will save 500 fakeprints per shard, with a total of 10 shards (adjustable via `--num_shards` and `--shard_size`). The `--speed_up discrete` flag applies discrete speed changes to augment the dataset with speed variations, which can help improve model robustness.
+This will save 500 fakeprints per shard, with a total of 10 shards (adjustable via `--num_shards` and `--shard_size`).
+
+The `--speed_up` flag enables the speed-up robustness attack, which applies random speed changes to audio before extracting fakeprints. This simulates a realistic adversarial scenario where an attacker slightly alters the playback speed to evade detection. Three modes are available:
+
+- **`none`** (default) — No speed change is applied.
+- **`discrete`** — Applies a random speed factor drawn from discrete bins aligned to CQT frequency bins (`2^(k/bins_per_octave)` for `k` in `[-40, 40]`), simulating pitch-aligned speed shifts.
+- **`continuous`** — Applies a random speed factor uniformly sampled between 0.8× and 1.25×, covering arbitrary speed variations.
+
+The applied speed factors are saved alongside the fakeprints in each `.npz` shard for traceability.
 
 You will find the output fakeprints in `data/train/attack/ai/` with both `stft` and `cqt` in a `.npz` format:
 ```

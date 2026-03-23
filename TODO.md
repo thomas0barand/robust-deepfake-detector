@@ -1,2 +1,0 @@
-- [] Find a way to download the dataset 
-- [] Split dataset
