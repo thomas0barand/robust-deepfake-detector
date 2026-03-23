@@ -41,12 +41,6 @@ robust-deepfake-detector/
 │   ├── test_cqt.ipynb
 │   └── test_pipeline.ipynb
 ├── scripts/
-│   ├── attack/
-│   │   ├── create_simple_signals.py
-│   │   ├── resampling/
-│   │   └── soxr/
-│   │       ├── compute/
-│   │       └── visualise/
 │   ├── collect/
 │   │   ├── download_fma.py
 │   │   ├── download_sonics.py
