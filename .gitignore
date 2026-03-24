@@ -9,10 +9,13 @@ results/
 
 # Large files
 *.mp3
+*.zip
 
 data/raw
 data/interim
 data/processed
+data/sonics
+data/fma_small
 
 .idea
 .env
@@ -39,3 +42,5 @@ CLAUDE.md
 *.run.xml
 *.bcf
 *.xdv
+
+*.egg-info/

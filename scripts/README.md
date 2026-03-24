@@ -40,7 +40,6 @@ Converts raw audio into checkerboard artifacts and saves them as compressed `.np
 
 To process to .mp3 files into fakeprints, run:
 ```bash
-export PYTHONPATH=$PYTHONPATH:.
 python /scripts/preprocess/pipeline.py \
     --data_dir path/to/sunov5 \
     --out_dir data/train/attack/ai \
@@ -49,7 +48,15 @@ python /scripts/preprocess/pipeline.py \
     --speed_up discrete \
 ```
 
-This will save 500 fakeprints per shard, with a total of 10 shards (adjustable via `--num_shards` and `--shard_size`). The `--speed_up discrete` flag applies discrete speed changes to augment the dataset with speed variations, which can help improve model robustness.
+This will save 500 fakeprints per shard, with a total of 10 shards (adjustable via `--num_shards` and `--shard_size`).
+
+The `--speed_up` flag enables the speed-up robustness attack, which applies random speed changes to audio before extracting fakeprints. This simulates a realistic adversarial scenario where an attacker slightly alters the playback speed to evade detection. Three modes are available:
+
+- **`none`** (default) — No speed change is applied.
+- **`discrete`** — Applies a random speed factor drawn from discrete bins aligned to CQT frequency bins (`2^(k/bins_per_octave)` for `k` in `[-40, 40]`), simulating pitch-aligned speed shifts.
+- **`continuous`** — Applies a random speed factor uniformly sampled between 0.8× and 1.25×, covering arbitrary speed variations.
+
+The applied speed factors are saved alongside the fakeprints in each `.npz` shard for traceability.
 
 You will find the output fakeprints in `data/train/attack/ai/` with both `stft` and `cqt` in a `.npz` format:
 ```
@@ -81,7 +88,6 @@ The best `.ckpt` is saved to `--ckpt_dir`. It can be used directly for inference
 To train the model with the resampled log-STFT fakeprints and convolution, run:
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:.
 python scripts/training/train.py \
     --data_dir data/train/ \
     --mode stft \
@@ -95,20 +101,20 @@ python scripts/training/train.py \
 To evaluate the best checkpoint on the test set, run:
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:.
 python scripts/testing/test.py \
     --data_dir data/test/attack/ \
-    --ckpt_path checkpoints/robustdetector-log_stft-use_conv.ckpt \
+    --ckpt_path checkpoints/attack/robustdetector-log_stft-use_conv-lamb=0.1.ckpt \
     --output_dir results/attack/ \
 ```
+
+Make sure `ckpt_path` refer to an existing checkpoint.
 
 ## Visualization
 
 To visualize the trained weights, run:
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:.
-python scripts/visualization/visualize_weights.py \
+python scripts/visualize/visualize_weights.py \
     --ckpt_path checkpoints/robustdetector-log_stft-use_conv.ckpt \
 ```
 
@@ -141,12 +147,4 @@ python scripts/visualization/visualize_weights.py \
 
 ```bash
 tensorboard --logdir logs/
-```
-
----
-
-## Requirements
-
-```bash
-pip install torch nnAudio lightning
 ```
