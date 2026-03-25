@@ -41,6 +41,9 @@ def parse_args():
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--lamb", type=float, default=0.1)
+    parser.add_argument("--use_margin", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--margin", type=float, default=1.0)
+    parser.add_argument("--margin_weight", type=float, default=0.1)
     parser.add_argument("--weight_decay", type=float, default=1e-5)
     parser.add_argument("--max_epochs", type=int, default=50)
     parser.add_argument("--patience", type=int, default=5)
@@ -94,6 +97,9 @@ def train(args):
         log_stft=args.log_stft,
         pos_weight=pos_weight,
         lamb=args.lamb,
+        use_margin=args.use_margin,
+        margin=args.margin,
+        margin_weight=args.margin_weight,
         lr=args.lr,
         weight_decay=args.weight_decay,
     )
@@ -103,6 +109,7 @@ def train(args):
     filename = f"robustdetector-{"log_stft" if args.log_stft else args.mode}"
     filename += "-use_conv" if args.use_convolution else ""
     filename += f"-lamb={args.lamb}" if args.use_convolution else ""
+    filename += f"-margin={args.margin_weight}" if args.use_margin else ""
 
     checkpoint_cb = ModelCheckpoint(
         dirpath=args.ckpt_dir,

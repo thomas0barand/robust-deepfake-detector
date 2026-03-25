@@ -32,6 +32,9 @@ class RobustDetector(L.LightningModule):
         # Loss params
         pos_weight=None,
         lamb=0.1,
+        use_margin=False,
+        margin=1.0,
+        margin_weight=0.1,
         # Optimizer params
         lr=1e-3,
         weight_decay=1e-5,
@@ -51,6 +54,9 @@ class RobustDetector(L.LightningModule):
         self.fmin = fmin
         self.log_stft = log_stft
         self.lamb = lamb
+        self.use_margin = use_margin
+        self.margin = margin
+        self.margin_weight = margin_weight
         self.lr = lr
         self.weight_decay = weight_decay
 
@@ -156,6 +162,16 @@ class RobustDetector(L.LightningModule):
         return fp_log
 
 
+    def compute_margin_loss(self, logits, labels):
+        """Penalizes when mean AI logits and mean Human logits are not separated by at least self.margin."""
+        ai_mask = labels == 1
+        human_mask = labels == 0
+        if ai_mask.sum() == 0 or human_mask.sum() == 0:
+            return torch.tensor(0.0, device=logits.device)
+        mean_ai = logits[ai_mask].mean()
+        mean_human = logits[human_mask].mean()
+        return F.relu(self.margin - (mean_ai - mean_human))
+
     def forward(self, x, convolve=False):
         return self.linear_proj(x, convolve=convolve)
     
@@ -193,6 +209,11 @@ class RobustDetector(L.LightningModule):
         else:
             loss = class_loss
 
+        if self.use_margin:
+            margin_loss = self.compute_margin_loss(logits.squeeze(-1), label)
+            loss = loss + self.margin_weight * margin_loss
+            self.log('train_margin_loss', margin_loss)
+
         self.log('train_loss', loss)
         return loss
 
@@ -220,6 +241,11 @@ class RobustDetector(L.LightningModule):
             self.log('val_reg_loss', reg_loss)
         else:
             loss = class_loss
+
+        if self.use_margin:
+            margin_loss = self.compute_margin_loss(logits.squeeze(-1), label)
+            loss = loss + self.margin_weight * margin_loss
+            self.log('val_margin_loss', margin_loss)
 
         self.auroc.update(probs, label.long())
         self.f1.update(probs, label.long())
