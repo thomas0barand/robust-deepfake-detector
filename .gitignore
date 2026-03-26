@@ -6,22 +6,16 @@
 logs/
 outputs/
 results/
+data/research/
 
 # Large files
 *.mp3
+*.wav
 *.zip
-
-data/raw
-data/interim
-data/processed
-data/sonics
-data/fma_small
 
 .idea
 .env
 .idea
-
-CLAUDE.md
 
 
 # LaTeX build artifacts

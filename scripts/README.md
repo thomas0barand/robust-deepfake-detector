@@ -23,12 +23,13 @@ Raw Audio Dataset          Preprocessing              PyTorch Dataset
 Audio files organized by label:
 ```
 data/
-├── ai/
-│   ├── track_001.mp3
-│   └── ...
-└── human/
-    ├── track_001.mp3
-    └── ...
+└── attack/
+    ├── ai/
+    │   ├── track_001.mp3
+    │   └── ...
+    └── human/
+        ├── track_001.mp3
+        └── ...
 ```
 
 ### 2. Preprocessing — Extract Fakeprints
@@ -40,7 +41,7 @@ Converts raw audio into checkerboard artifacts and saves them as compressed `.np
 
 To process to .mp3 files into fakeprints, run:
 ```bash
-python /scripts/preprocess/pipeline.py \
+python /scripts/pipeline.py \
     --data_dir path/to/sunov5 \
     --out_dir data/train/attack/ai \
     --num_shards 10 \
@@ -88,7 +89,7 @@ The best `.ckpt` is saved to `--ckpt_dir`. It can be used directly for inference
 To train the model with the resampled log-STFT fakeprints and convolution, run:
 
 ```bash
-python scripts/training/train.py \
+python scripts/train.py \
     --data_dir data/train/ \
     --mode stft \
     --use_convolution \
@@ -101,7 +102,7 @@ python scripts/training/train.py \
 To evaluate the best checkpoint on the test set, run:
 
 ```bash
-python scripts/testing/test.py \
+python scripts/test.py \
     --data_dir data/test/attack/ \
     --ckpt_path checkpoints/attack/robustdetector-log_stft-use_conv-lamb=0.1.ckpt \
     --output_dir results/attack/ \
@@ -114,7 +115,7 @@ Make sure `ckpt_path` refer to an existing checkpoint.
 To visualize the trained weights, run:
 
 ```bash
-python scripts/visualize/visualize_weights.py \
+python scripts/visualize_weights.py \
     --ckpt_path checkpoints/robustdetector-log_stft-use_conv.ckpt \
 ```
 

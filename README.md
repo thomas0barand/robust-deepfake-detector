@@ -4,7 +4,7 @@
 
 Setup a Python 3.13 virtual environment, activate it and install packages listed in `pyproject.toml`:
 
-```shell
+```bash
 pip install -e .
 ```
 
@@ -18,47 +18,18 @@ robust-deepfake-detector/
 │   ├── attack/
 │   └── noattack/
 ├── data/
-│   ├── research/
-│   │   └── signals/
-│   ├── suno_v5/
 │   ├── test/
-│   │   ├── attack/
-│   │   │   ├── ai/
-│   │   │   └── human/
-│   │   └── noattack/
-│   │       ├── ai/
-│   │       └── human/
 │   └── train/
-│       ├── attack/
-│       │   ├── ai/
-│       │   └── human/
-│       └── noattack/
-│           ├── ai/
-│           └── human/
-├── outputs/
-│   └── figures/
-│       └── signals/
-├── references/
-│   └── deezer/
 ├── research/
-│   ├── batch_crosscorr.py
-│   ├── crosscorr.py
-│   ├── show_lag.ipynb
-│   ├── test_cqt.ipynb
-│   └── test_pipeline.ipynb
-├── scripts/
 │   ├── collect/
-│   │   ├── download_fma.py
-│   │   ├── download_sonics.py
-│   │   ├── download_suno_5_gdrive.py
-│   │   └── suno_scraping/
-│   ├── preprocess/
-│   │   ├── dataset_schema_v1.json
-│   │   ├── manifest_pipeline.py
-│   │   └── pipeline.py
-│   ├── testing/
-│   ├── training/
-│   ├── visualize/
+│   ├── notebooks/
+│   └── preprocess/
+├── scripts/
+│   ├── pipeline.py
+│   ├── preprocessing_pipeline.ipynb
+│   ├── test.py
+│   ├── train.py
+│   ├── visualize_weights.py
 │   └── utils.py
 └── src/
     ├── data/
@@ -93,16 +64,16 @@ echo "GDRIVE_API_KEY=your_key_here" > .env
 source .env
 
 # option C: inline
-python scripts/collect/download_suno_5_gdrive.py --api-key your_key_here
+python research/collect/download_suno_5_gdrive.py --api-key your_key_here
 ```
 
 5. Run the download script:
 
 ```bash
-python scripts/collect/download_suno_5_gdrive.py -o data/suno_v5
+python research/collect/download_suno_5_gdrive.py -o data/suno_v5
 
 # or a subset
-python scripts/collect/download_suno_5_gdrive.py -o data/suno_v5 -n 1000
+python research/collect/download_suno_5_gdrive.py -o data/suno_v5 -n 1000
 ```
 
 ### Upload to Google Drive (Colab)
@@ -118,7 +89,7 @@ drive.mount('/content/drive')
 !git checkout THOMAS/dataset
 !pip install aiohttp tqdm
 
-!python scripts/collect/suno_scraping/download.py \
+!python research/collect/suno_scraping/download.py \
   -i src/dataset/v5/suno_urls_v5.json \
   -o "/content/drive/MyDrive/Robust deepfake detector/data/suno_v5" \
   --limit 10000
