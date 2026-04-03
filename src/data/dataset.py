@@ -43,10 +43,11 @@ class FakeprintDataset(Dataset):
 
                 fakeprints = data[mode]
                 fakeprints = fakeprints[:, mask]  # (N, feature_dim)
-                speed_factors = data.get("speed_factors", [1.0])  # Optional speed factors for augmentation
+                speed_factors = data.get("speed_factors", [1.0])
 
                 for fp, speed_factor in zip(fakeprints, speed_factors):
-                    
+                    if np.isnan(fp).any() or np.isinf(fp).any():
+                        continue
                     self.samples.append((fp, label, speed_factor))
 
     def __len__(self):

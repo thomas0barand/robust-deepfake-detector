@@ -186,10 +186,13 @@ class RobustDetector(L.LightningModule):
             mask = label == 1
             bin_shift = torch.round(torch.log2(su_factor) * bins_per_octave)
             lag_index = (fp.shape[-1] // 2) + bin_shift
-            reg_loss = F.cross_entropy(cross_corr[mask], lag_index[mask].long())
-            loss = class_loss + self.lamb * reg_loss
-            self.log('train_class_loss', class_loss)
-            self.log('train_reg_loss', reg_loss)
+            if mask.any():
+                reg_loss = F.cross_entropy(cross_corr[mask], lag_index[mask].long())
+                loss = class_loss + self.lamb * reg_loss
+                self.log('train_class_loss', class_loss)
+                self.log('train_reg_loss', reg_loss)
+            else:
+                loss = class_loss
         else:
             loss = class_loss
 
@@ -214,10 +217,13 @@ class RobustDetector(L.LightningModule):
             mask = label == 1
             bin_shift = torch.round(torch.log2(su_factor) * bins_per_octave)
             lag_index = (fp.shape[-1] // 2) + bin_shift
-            reg_loss = F.cross_entropy(cross_corr[mask], lag_index[mask].long())
-            loss = class_loss + self.lamb * reg_loss
-            self.log('val_class_loss', class_loss)
-            self.log('val_reg_loss', reg_loss)
+            if mask.any():
+                reg_loss = F.cross_entropy(cross_corr[mask], lag_index[mask].long())
+                loss = class_loss + self.lamb * reg_loss
+                self.log('val_class_loss', class_loss)
+                self.log('val_reg_loss', reg_loss)
+            else:
+                loss = class_loss
         else:
             loss = class_loss
 

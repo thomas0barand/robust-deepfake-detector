@@ -1,8 +1,9 @@
+import os
 import argparse
 import torch
 import lightning as L
 
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -10,16 +11,40 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from src.models import RobustDetector
 from src.data import FakeprintDataset
 
+'''
+python -m scripts.train \
+  --data_dir data/sonics/attack \
+  --ckpt_dir checkpoints/sonics \
+  --mode stft \
+  --log_stft \
+  --use_norm \
+  --use_convolution \
+  --use_bias \
+  --freq_range 1000 8000 \
+  --sampling_rate 16000 \
+  --n_fft 16384 \
+  --bins_per_octave 192 \
+  --bins_per_octave_stft 1920 \
+  --hull_area 20 \
+  --fmin 32.7 \
+  --lr 0.001 \
+  --lamb 0.5 \
+  --weight_decay 1e-5 \
+  --max_epochs 50 \
+  --patience 5 \
+  --batch_size 64 \
+  --num_workers 7 \
+  --seed 42
+  '''
+
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train RobustDetector")
 
-    parser.add_argument("--data_dir", type=str, default="data/train/noattack/", help="Directory containing training fakeprint data")
-    parser.add_argument("--ckpt_dir", type=str, default="checkpoints/noattack/", help="Directory to save model checkpoints")
+    parser.add_argument("--data_dir", type=str, default="data/sonics", help="Base directory with train/ and valid/ subdirs")
+    parser.add_argument("--ckpt_dir", type=str, default="checkpoints/sonics/", help="Directory to save model checkpoints")
     parser.add_argument("--mode", type=str, default="stft", choices=["stft", "cqt"], help="Type of time-frequency transform to use")
-
-    # Dataset
-    parser.add_argument("--val_split", type=float, default=0.1)
 
     # Model
     parser.add_argument("--use_norm", action=argparse.BooleanOptionalAction, default=True)
@@ -28,13 +53,14 @@ def parse_args():
 
     # Transform
     parser.add_argument("--n_fft", type=int, default=16384)
-    parser.add_argument("--sampling_rate", type=int, default=44100)
+    parser.add_argument("--sampling_rate", type=int, default=16000)
     parser.add_argument("--bins_per_octave", type=int, default=192)
-    parser.add_argument("--bins_per_octave_stft", type=int, default=1920)
+    # log_stft: 192 bpo × log2(8000/1000)=3 octaves → 576 log bins, matching CQT resolution
+    parser.add_argument("--bins_per_octave_stft", type=int, default=192)
     parser.add_argument("--hull_area", type=int, default=20)
-    parser.add_argument("--freq_range", type=int, nargs=2, default=[5000, 16000], metavar=("F_MIN", "F_MAX"))
+    parser.add_argument("--freq_range", type=int, nargs=2, default=[1000, 8000], metavar=("F_MIN", "F_MAX"))
     parser.add_argument("--fmin", type=float, default=32.7)
-    parser.add_argument("--log_stft", action=argparse.BooleanOptionalAction, default=False, help="Whether to convert STFT features to log-frequency scale")
+    parser.add_argument("--log_stft", action=argparse.BooleanOptionalAction, default=True, help="Remap linear STFT bins to log-frequency scale")
 
     # Training
     parser.add_argument("--batch_size", type=int, default=64)
@@ -47,7 +73,7 @@ def parse_args():
 
     # Misc
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--log_dir", type=str, default="logs/")
+    parser.add_argument("--log_dir", type=str, default="logs/sonics/")
 
     return parser.parse_args()
 
@@ -55,8 +81,7 @@ def parse_args():
 def train(args):
     L.seed_everything(args.seed)
 
-    dataset = FakeprintDataset(
-        args.data_dir,
+    dataset_kwargs = dict(
         mode=args.mode,
         freq_range=args.freq_range,
         n_fft=args.n_fft,
@@ -64,20 +89,19 @@ def train(args):
         bins_per_octave=args.bins_per_octave,
     )
 
-    n_val = int(args.val_split * len(dataset))
-    n_train = len(dataset) - n_val
-    train_set, val_set = random_split(dataset, [n_train, n_val])
-    print(f"Train: {len(train_set)} — Val: {len(val_set)}")
+    train_dataset = FakeprintDataset(os.path.join(args.data_dir, "train"), **dataset_kwargs)
+    val_dataset   = FakeprintDataset(os.path.join(args.data_dir, "valid"), **dataset_kwargs)
+    print(f"Train: {len(train_dataset)} — Val: {len(val_dataset)}")
 
-    # Compute pos_weight from train set to handle class imbalance
-    train_labels = torch.tensor([dataset.samples[i][1] for i in train_set.indices])
+    # Compute pos_weight from train labels to handle class imbalance
+    train_labels = torch.tensor([s[1] for s in train_dataset.samples])
     n_pos = train_labels.sum().item()
     n_neg = len(train_labels) - n_pos
     pos_weight = n_neg / (n_pos + 1e-8)
     print(f"Class balance — AI: {n_pos}, Human: {n_neg}, pos_weight: {pos_weight:.2f}")
 
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,  num_workers=args.num_workers, pin_memory=True)
-    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+    val_loader   = DataLoader(val_dataset,   batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
 
     model = RobustDetector(
         transform_type=args.mode,
@@ -100,7 +124,8 @@ def train(args):
 
     print(f"Feature dimension: {model.feature_dim}")
 
-    filename = f"robustdetector-{"log_stft" if args.log_stft else args.mode}"
+    mode_str = "log_stft" if args.log_stft else args.mode
+    filename = f"robustdetector-sonics-{mode_str}"
     filename += "-use_conv" if args.use_convolution else ""
     filename += f"-lamb={args.lamb}" if args.use_convolution else ""
 

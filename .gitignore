@@ -1,6 +1,11 @@
 .venv/
 .DS_Store
 
+# data
+data/sonics/*
+data/train/*
+data/test/*
+
 **/__pycache__/
 
 logs/
