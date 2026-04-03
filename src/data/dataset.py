@@ -17,6 +17,7 @@ class FakeprintDataset(Dataset):
         n_fft: int = 16384,
         sampling_rate: int = 44100,
         bins_per_octave: int = 192,
+        gen_model: str = "ai",
     ):
         self.data_dir = data_dir
         self.mode = mode
@@ -31,7 +32,7 @@ class FakeprintDataset(Dataset):
         freqs = get_freqs(n_fft=n_fft, sr=sampling_rate, log=log, bins_per_octave=bins_per_octave)
         mask = get_freqs_mask(freqs, sampling_rate, freq_range=freq_range)
 
-        for label, subdir in [(0, "human"), (1, "ai")]:
+        for label, subdir in [(0, "human"), (1, gen_model)]:
             npz_paths = sorted(glob.glob(os.path.join(data_dir, subdir, "*.npz")))
             for path in npz_paths:
 

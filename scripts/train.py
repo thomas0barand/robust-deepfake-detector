@@ -12,8 +12,9 @@ from src.models import RobustDetector
 from src.data import FakeprintDataset
 
 '''
-python -m scripts.train \
-  --data_dir data/sonics/attack \
+!python -m scripts.train \
+  --data_dir /content/data/sonics/attack \
+  --gen_model suno_v3.5 \
   --ckpt_dir checkpoints/sonics \
   --mode stft \
   --log_stft \
@@ -23,17 +24,16 @@ python -m scripts.train \
   --freq_range 1000 8000 \
   --sampling_rate 16000 \
   --n_fft 16384 \
-  --bins_per_octave 192 \
-  --bins_per_octave_stft 1920 \
+  --bins_per_octave_stft 768 \
   --hull_area 20 \
   --fmin 32.7 \
   --lr 0.001 \
-  --lamb 0.5 \
+  --lamb 0.1 \
   --weight_decay 1e-5 \
   --max_epochs 50 \
   --patience 5 \
-  --batch_size 64 \
   --num_workers 7 \
+  --batch_size 64 \
   --seed 42
   '''
 
@@ -43,6 +43,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train RobustDetector")
 
     parser.add_argument("--data_dir", type=str, default="data/sonics", help="Base directory with train/ and valid/ subdirs")
+    parser.add_argument("--gen_model", type=str, default="ai", help="AI subfolder name (e.g. suno_v3.5)")
     parser.add_argument("--ckpt_dir", type=str, default="checkpoints/sonics/", help="Directory to save model checkpoints")
     parser.add_argument("--mode", type=str, default="stft", choices=["stft", "cqt"], help="Type of time-frequency transform to use")
 
@@ -87,6 +88,7 @@ def train(args):
         n_fft=args.n_fft,
         sampling_rate=args.sampling_rate,
         bins_per_octave=args.bins_per_octave,
+        gen_model=args.gen_model,
     )
 
     train_dataset = FakeprintDataset(os.path.join(args.data_dir, "train"), **dataset_kwargs)
