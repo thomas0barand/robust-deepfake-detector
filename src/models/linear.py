@@ -29,7 +29,7 @@ class LinearProj(nn.Module):
             x_conv = x.unsqueeze(1)  # (B, 1, F)
             w_conv = self.weights.unsqueeze(1)  # (1, 1, F)
             cross_corr = F.conv1d(x_conv, w_conv, padding="same").squeeze(1) # (B, 1, F) x (1, 1, F) -> (B, F)
-            logits, _ = torch.max(cross_corr, dim=1)  # (B, F) -> (B, 1)
+            logits, _ = torch.max(cross_corr, dim=1, keepdim=True)  # (B, F) -> (B, 1)
         else:
             logits = torch.matmul(x, self.weights.T) # (B, F) x (F, 1) -> (B, 1)
             cross_corr = None
