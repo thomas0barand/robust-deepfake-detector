@@ -2,6 +2,9 @@
 
 ## Setup
 
+
+### Simple setup
+
 Setup a Python 3.13 virtual environment, activate it and install packages listed in `pyproject.toml`:
 
 ```bash
@@ -9,6 +12,12 @@ pip install -e .
 ```
 
 To ensure reproducibility, we kept the lockfile `requirements.lock` with all the pinned dependencies.
+
+### Dev setup
+If you need to run the preprocessing pipeline for the pitch shift attack, you will need to install the following dependency:
+- rubberband [https://breakfastquay.com/rubberband/]: software library for audio time-stretching and pitch-shifting
+```
+
 
 ## Project structure
 
