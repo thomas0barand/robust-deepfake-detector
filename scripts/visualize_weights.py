@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
+import math, torch
 
 from src.models import RobustDetector
-from src.utils import get_freqs, get_freqs_mask
 
 
 def plot_weights(
@@ -15,20 +15,19 @@ def plot_weights(
     weights = model.linear_proj.weights.detach().cpu().numpy().squeeze()
 
     if model.transform_type == "stft" and model.log_stft:
-        freqs = get_freqs(
-            n_fft=model.n_fft,
-            sr=model.sampling_rate,
-            log=True,
-            bins_per_octave=model.bins_per_octave_stft,
-            fmin=model.fmin
-        )
-        mask = get_freqs_mask(freqs, model.sampling_rate, freq_range=model.freq_range)
-        freqs = freqs[mask].cpu().numpy()
+        n_log_bins = int(math.ceil(model.bins_per_octave_stft * math.log2(model.freq_range[1] / model.freq_range[0])))
+        freqs = torch.logspace(
+            math.log10(model.freq_range[0]),
+            math.log10(model.freq_range[1]),
+            steps=n_log_bins,
+        ).numpy()
     else:
         freqs = model.freqs[model.mask].cpu().numpy()
 
     assert len(weights) == len(freqs), f"Shape mismatch: weights {weights.shape} vs freqs {freqs.shape}"
 
+
+    print(f"Freq range = {model.freq_range}")
     plt.figure(figsize=(14, 6))
     plt.plot(freqs, weights, linewidth=0.8, alpha=0.8)
     plt.axhline(0, color='red', linestyle='--', linewidth=1, alpha=0.5)

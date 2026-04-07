@@ -9,7 +9,7 @@ data/test/*
 **/__pycache__/
 
 logs/
-outputs/
+# outputs/
 results/
 data/research/
 
