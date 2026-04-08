@@ -9,11 +9,15 @@ from src.utils import load_audio, speed_up
 from src.data.preprocessing import pitch_shift
 
 
-def apply_attack(tracks_folder, attack_type: Literal["time_stretch", "pitch_shift"], lo_bound: float, hi_bound: float):
+def apply_attack(tracks_folder, attack_type: Literal["time_stretch", "pitch_shift"], lo_bound: float, hi_bound: float, custom_output_filename: str = None):
     """
     Apply either time stretch or pitch shift attack to raw audio.
     """
-    attacked_tracks_path = tracks_folder + "_" + attack_type
+    if not custom_output_filename:
+        attacked_tracks_path = tracks_folder + "_" + attack_type
+    else:
+        attacked_tracks_path = custom_output_filename
+
     os.makedirs(attacked_tracks_path, exist_ok=True)
     metadata = dict()
 
@@ -59,6 +63,8 @@ if __name__ == "__main__":
     parser.add_argument("--attack_type", type=str, choices=["time_stretch", "pitch_shift"], default="time_stretch", help="Attack type to apply (default: time_stretch).")
     parser.add_argument("--lo", type=float, default=0.8, help="Lower bound of the attack ratio (default: 0.8).")
     parser.add_argument("--hi", type=float, default=1.2, help="Upper bound of the attack ratio (default: 1.2).")
+    parser.add_argument("--out_filename", type=str, default=None, help="Custom output filename.")
+
     args = parser.parse_args()
 
-    apply_attack(args.tracks_folder, args.attack_type, args.lo, args.hi)
+    apply_attack(args.tracks_folder, args.attack_type, args.lo, args.hi, args.out_filename)
