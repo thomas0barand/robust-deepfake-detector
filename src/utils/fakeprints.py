@@ -13,7 +13,7 @@ def load_audio(file_path, max_duration=None):
         print(f"Error loading {file_path}: {e}")
         return None, None
     
-@deprecated("Moved to src.data.preprocessing")
+@deprecated("This method has been deprecated on 08-04. Please use: from src.data.preprocessing import time_stretch")
 def speed_up(waveform, sr, speed_factor):
     if speed_factor == 1.0:
         return waveform
