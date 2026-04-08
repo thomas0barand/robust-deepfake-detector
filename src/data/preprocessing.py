@@ -1,6 +1,5 @@
 import torch
 import soxr
-import librosa
 import numpy as np
 
 import src.utils.pyrubberband.pyrb as pyrb
@@ -20,3 +19,13 @@ def pitch_shift(waveform, sr, pitch_factor):
     ]
 
     return torch.from_numpy(np.stack(shifted_channels, axis=0)).to(device)
+
+def time_stretch(waveform, sr, speed_factor):
+    if speed_factor == 1.0:
+        return waveform
+    
+    device = waveform.device
+    new_sr = int(sr / speed_factor)
+    resampled_waveform = soxr.resample(waveform.cpu().numpy().T, sr, new_sr, quality="VHQ").T
+
+    return torch.from_numpy(resampled_waveform).to(device)

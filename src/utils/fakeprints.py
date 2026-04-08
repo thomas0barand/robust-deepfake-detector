@@ -2,7 +2,7 @@ import torch
 import soxr
 import librosa
 import numpy as np
-
+from warnings import deprecated
 
 def load_audio(file_path, max_duration=None):
     try:
@@ -13,7 +13,7 @@ def load_audio(file_path, max_duration=None):
         print(f"Error loading {file_path}: {e}")
         return None, None
     
-
+@deprecated("Moved to src.data.preprocessing")
 def speed_up(waveform, sr, speed_factor):
     if speed_factor == 1.0:
         return waveform

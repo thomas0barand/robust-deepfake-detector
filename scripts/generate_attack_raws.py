@@ -5,8 +5,8 @@ import numpy as np
 import soundfile as sf
 from pathlib import Path
 from typing import Literal
-from src.utils import load_audio, speed_up
-from src.data.preprocessing import pitch_shift
+from src.utils import load_audio
+from src.data.preprocessing import pitch_shift, time_stretch
 
 
 def apply_attack(tracks_folder, attack_type: Literal["time_stretch", "pitch_shift"], lo_bound: float, hi_bound: float, custom_output_filename: str = None):
@@ -26,7 +26,7 @@ def apply_attack(tracks_folder, attack_type: Literal["time_stretch", "pitch_shif
 
     attack_transform = None
     if attack_type == "time_stretch":
-        attack_transform = speed_up
+        attack_transform = time_stretch
     elif attack_type == "pitch_shift":
         attack_transform = pitch_shift
     else:
