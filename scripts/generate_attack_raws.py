@@ -6,10 +6,10 @@ import soundfile as sf
 from pathlib import Path
 from typing import Literal
 from src.utils import load_audio
-from src.data.preprocessing import pitch_shift, time_stretch
+from src.data.preprocessing import pitch_shift, resample
 
 
-def apply_attack(tracks_folder, attack_type: Literal["time_stretch", "pitch_shift"], lo_bound: float, hi_bound: float, custom_output_filename: str = None):
+def apply_attack(tracks_folder, attack_type: Literal["resample", "pitch_shift"], lo_bound: float, hi_bound: float, custom_output_filename: str = None):
     """
     Apply either time stretch or pitch shift attack to raw audio.
     """
@@ -25,12 +25,12 @@ def apply_attack(tracks_folder, attack_type: Literal["time_stretch", "pitch_shif
     print(f"Found {len(all_files)} files in {tracks_folder}")
 
     attack_transform = None
-    if attack_type == "time_stretch":
-        attack_transform = time_stretch
+    if attack_type == "resample":
+        attack_transform = resample
     elif attack_type == "pitch_shift":
         attack_transform = pitch_shift
     else:
-        raise ValueError(f"Unknown attack type: {attack_type!r}. Expected 'time_stretch' or 'pitch_shift'.")
+        raise ValueError(f"Unknown attack type: {attack_type!r}. Expected 'resample' or 'pitch_shift'.")
 
     # Apply attack
     for i, file_path in enumerate(all_files):
@@ -60,7 +60,7 @@ def apply_attack(tracks_folder, attack_type: Literal["time_stretch", "pitch_shif
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Apply time stretch or pitch shift attack to raw audio files.")
     parser.add_argument("tracks_folder", type=str, help="Path to the folder containing audio files.")
-    parser.add_argument("--attack_type", type=str, choices=["time_stretch", "pitch_shift"], default="time_stretch", help="Attack type to apply (default: time_stretch).")
+    parser.add_argument("--attack_type", type=str, choices=["resample", "pitch_shift"], default="resample", help="Attack type to apply (default: resample).")
     parser.add_argument("--lo", type=float, default=0.8, help="Lower bound of the attack ratio (default: 0.8).")
     parser.add_argument("--hi", type=float, default=1.2, help="Upper bound of the attack ratio (default: 1.2).")
     parser.add_argument("--out_filename", type=str, default=None, help="Custom output filename.")
