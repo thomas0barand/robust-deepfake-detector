@@ -9,6 +9,7 @@ results/
 data/research/
 
 # Large files
+data/**/*.csv
 *.mp3
 *.wav
 *.zip
