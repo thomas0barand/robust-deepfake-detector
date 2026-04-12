@@ -11,14 +11,16 @@ from src.utils import get_freqs, get_freqs_mask
 class FakeprintDataset(Dataset):
     def __init__(
         self,
-        data_dir: str,
-        mode: str = "cqt",
+        ai_dir,
+        human_dir,
+        mode="stft",
         freq_range: list = [5000, 16000],
         n_fft: int = 16384,
         sampling_rate: int = 44100,
         bins_per_octave: int = 192,
     ):
-        self.data_dir = data_dir
+        self.ai_dir = ai_dir
+        self.human_dir = human_dir
         self.mode = mode
         self.freq_range = freq_range
         self.n_fft = n_fft
@@ -31,8 +33,8 @@ class FakeprintDataset(Dataset):
         freqs = get_freqs(n_fft=n_fft, sr=sampling_rate, log=log, bins_per_octave=bins_per_octave)
         mask = get_freqs_mask(freqs, sampling_rate, freq_range=freq_range)
 
-        for label, subdir in [(0, "human"), (1, "ai")]:
-            npz_paths = sorted(glob.glob(os.path.join(data_dir, subdir, "*.npz")))
+        for label, directory in [(0, self.human_dir), (1, self.ai_dir)]:
+            npz_paths = sorted(glob.glob(os.path.join(directory, "*.npz")))
             for path in npz_paths:
 
                 data = np.load(path)
@@ -43,15 +45,15 @@ class FakeprintDataset(Dataset):
 
                 fakeprints = data[mode]
                 fakeprints = fakeprints[:, mask]  # (N, feature_dim)
-                speed_factors = data.get("speed_factors", [1.0])  # Optional speed factors for augmentation
+                attack_factors = data.get("attack_factors", [1.0])  # Optional attack factors for augmentation
 
-                for fp, speed_factor in zip(fakeprints, speed_factors):
+                for fp, attack_factor in zip(fakeprints, attack_factors):
                     
-                    self.samples.append((fp, label, speed_factor))
+                    self.samples.append((fp, label, attack_factor))
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        fp, label, speed_factor = self.samples[idx]
-        return torch.from_numpy(fp).float(), torch.tensor(label).float(), torch.tensor(speed_factor).float()
+        fp, label, attack_factor = self.samples[idx]
+        return torch.from_numpy(fp).float(), torch.tensor(label).float(), torch.tensor(attack_factor).float()

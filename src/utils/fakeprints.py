@@ -1,8 +1,6 @@
 import torch
-import soxr
 import librosa
 import numpy as np
-from warnings import deprecated
 
 def load_audio(file_path, max_duration=None):
     try:
@@ -12,17 +10,6 @@ def load_audio(file_path, max_duration=None):
     except Exception as e:
         print(f"Error loading {file_path}: {e}")
         return None, None
-    
-@deprecated("This method has been deprecated on 08-04. Please use: from src.data.preprocessing import resample")
-def speed_up(waveform, sr, speed_factor):
-    if speed_factor == 1.0:
-        return waveform
-    
-    device = waveform.device
-    new_sr = int(sr / speed_factor)
-    resampled_waveform = soxr.resample(waveform.cpu().numpy().T, sr, new_sr, quality="VHQ").T
-
-    return torch.from_numpy(resampled_waveform).to(device)
 
 
 def get_spectrum(transform, waveform):

@@ -5,9 +5,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import lightning as L
-from sklearn.metrics import roc_auc_score, f1_score, precision_score, accuracy_score, recall_score, roc_curve, precision_recall_curve
+from sklearn.metrics import roc_auc_score, f1_score, precision_score, accuracy_score, recall_score, roc_curve
 from pathlib import Path
 
+METRIC_RANGE = (0.7, 1.4)
+AF_PLOT_POINTS = np.linspace(0.5, 2.0, 16)
 
 class MetricsCallback(L.Callback):
     def __init__(self, output_dir="results/", filename="test", threshold_metric="f1"):
@@ -16,56 +18,47 @@ class MetricsCallback(L.Callback):
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.filename = filename
         self.threshold_metric = threshold_metric
-        self._preds, self._labels = [], []
-        # Latency tracking (per-batch, in milliseconds)
-        self._batch_latencies: list[float] = []
-        self._batch_sizes: list[int] = []
+        self._preds, self._labels, self._afs = [], [], []
+        self._batch_latencies, self._batch_sizes = [], []
 
     def _collect(self, pl_module, batch):
-        x, y, lag = batch
-        t_start = time.perf_counter()
+        x, y, af = batch
+        t0 = time.perf_counter()
         with torch.inference_mode():
             if pl_module.transform_type == "stft" and pl_module.log_stft:
                 x = pl_module.stft_to_log(x)
-            logits, cross_corr = pl_module(x.to(pl_module.device), convolve=pl_module.use_convolution)
+            logits, _ = pl_module(x.to(pl_module.device), convolve=pl_module.use_convolution)
             preds = torch.sigmoid(logits).squeeze(-1)
-        # Sync CUDA ops before measuring elapsed time
         if x.device.type == "cuda":
             torch.cuda.synchronize()
-        elapsed_ms = (time.perf_counter() - t_start) * 1_000
-
         self._preds.append(preds.cpu())
         self._labels.append(y.cpu())
-        self._batch_latencies.append(elapsed_ms)
+        self._afs.append(af.cpu() if isinstance(af, torch.Tensor) else torch.tensor(af, dtype=torch.float32))
+        self._batch_latencies.append((time.perf_counter() - t0) * 1000)
         self._batch_sizes.append(x.shape[0])
 
-    def _compute_latency_stats(self) -> dict:
-        """Return latency statistics (ms) across all collected batches."""
-        latencies = np.array(self._batch_latencies)
-        sizes = np.array(self._batch_sizes)
-        total_samples = sizes.sum()
-        total_ms = latencies.sum()
-        per_sample_ms = latencies / sizes  # per-sample latency for every batch
-
+    def _latency_stats(self):
+        lat, sz = np.array(self._batch_latencies), np.array(self._batch_sizes)
         return {
-            "latency_per_sample_mean_ms":   float(per_sample_ms.mean()),
-            "throughput_samples_per_sec": float(total_samples / (total_ms / 1_000)),
+            "latency_per_sample_mean_ms": float((lat / sz).mean()),
+            "throughput_samples_per_sec": float(sz.sum() / (lat.sum() / 1000)),
         }
 
     def _flush(self):
-        preds = torch.cat(self._preds).numpy()
-        labels = torch.cat(self._labels).numpy().astype(int)
-
-        # Compute latency stats before resetting
-        latency_stats = self._compute_latency_stats()
-
-        # Reset state
-        self._preds, self._labels = [], []
+        all_preds = torch.cat(self._preds).numpy()
+        all_labels = torch.cat(self._labels).numpy().astype(int)
+        all_afs = torch.cat(self._afs).numpy()
+        latency_stats = self._latency_stats()
+        self._preds, self._labels, self._afs = [], [], []
         self._batch_latencies, self._batch_sizes = [], []
 
+        lo, hi = METRIC_RANGE
+        mask = (all_afs > lo) & (all_afs < hi)
+        preds, labels = all_preds[mask], all_labels[mask]
+
         thresholds = np.linspace(0.01, 0.99, 199)
-        f1_scores = [f1_score(labels, (preds >= t).astype(int), zero_division=0) for t in thresholds]
-        best_t = thresholds[np.argmax(f1_scores)]
+        f1s = [f1_score(labels, (preds >= t).astype(int), zero_division=0) for t in thresholds]
+        best_t = thresholds[np.argmax(f1s)]
         pred_bin = (preds >= best_t).astype(int)
 
         metrics = {
@@ -77,75 +70,66 @@ class MetricsCallback(L.Callback):
             "threshold": best_t,
         }
 
-        all_stats = {**metrics, **latency_stats}
-        self._save_metrics(all_stats)
-        self._plot(preds, labels, metrics, best_t, f1_scores, thresholds, latency_stats)
-
-        print(
-            f"\n[TEST] threshold={best_t:.3f} | "
-            + " | ".join(f"{k}={v:.4f}" for k, v in metrics.items() if k != "threshold")
-            + f"\n[LATENCY] mean={latency_stats['latency_per_sample_mean_ms']:.1f}ms"
-            + f"  throughput={latency_stats['throughput_samples_per_sec']:.1f} samples/s"
-        )
-        return metrics, best_t
-
-    # Persistence helpers
-    def _save_metrics(self, stats: dict):
-        """Save all metrics + latency stats to JSON and append a row to CSV."""
-        # JSON (one file per run)
+        stats = {**metrics, **latency_stats}
         json_path = self.output_dir / f"{self.filename}_metrics.json"
         with open(json_path, "w") as f:
             json.dump(stats, f, indent=2)
 
-        # CSV (append so successive runs accumulate)
         csv_path = self.output_dir / "all_runs_metrics.csv"
         write_header = not csv_path.exists()
         with open(csv_path, "a", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["run", *stats.keys()])
+            w = csv.DictWriter(f, fieldnames=["run", *stats.keys()])
             if write_header:
-                writer.writeheader()
-            writer.writerow({"run": self.filename, **stats})
+                w.writeheader()
+            w.writerow({"run": self.filename, **stats})
 
-        print(f"[METRICS] Saved → {json_path}  (CSV → {csv_path})")
-
-    # Plotting
-    def _plot(self, preds, labels, metrics, best_t, f1_scores, thresholds, latency_stats):
-        fig, axes = plt.subplots(1, 4, figsize=(24, 4))
-        fig.suptitle(
-            "TEST | " + "  ".join(f"{k}={v:.3f}" for k, v in metrics.items() if k != "threshold"),
-            fontsize=10,
+        self._plot(preds, labels, metrics, best_t, f1s, thresholds, all_preds, all_labels, all_afs)
+        print(
+            f"\n[TEST] af∈{METRIC_RANGE} ({mask.sum()}/{len(mask)}) | threshold={best_t:.3f} | "
+            + " | ".join(f"{k}={v:.4f}" for k, v in metrics.items() if k != "threshold")
+            + f"\n[LATENCY] mean={latency_stats['latency_per_sample_mean_ms']:.1f}ms  "
+            + f"throughput={latency_stats['throughput_samples_per_sec']:.1f} samples/s"
         )
 
-        # Score distribution
+    def _f1_vs_af(self, all_preds, all_labels, all_afs, best_t, hw=0.1):
+        f1s, counts = np.full(len(AF_PLOT_POINTS), np.nan), np.zeros(len(AF_PLOT_POINTS), int)
+        for i, c in enumerate(AF_PLOT_POINTS):
+            m = (all_afs >= c - hw) & (all_afs < c + hw)
+            if m.sum() >= 2 and len(np.unique(all_labels[m])) == 2:
+                f1s[i] = f1_score(all_labels[m], (all_preds[m] >= best_t).astype(int), zero_division=0)
+                counts[i] = m.sum()
+        return f1s, counts
+
+    def _plot(self, preds, labels, metrics, best_t, f1s, thresholds, all_preds, all_labels, all_afs):
+        fig, axes = plt.subplots(1, 4, figsize=(25, 4))
+        fig.suptitle("TEST | " + "  ".join(f"{k}={v:.3f}" for k, v in metrics.items() if k != "threshold"), fontsize=10)
+
         bins = np.linspace(0, 1, 51)
         axes[0].hist(preds[labels == 0], bins=bins, alpha=0.7, density=True, label="Real")
         axes[0].hist(preds[labels == 1], bins=bins, alpha=0.7, density=True, label="Fake")
         axes[0].axvline(best_t, color="yellow", linestyle="--", label=f"t={best_t:.2f}")
-        axes[0].set(title="Score Distribution", xlabel="P(fake)")
-        axes[0].legend(fontsize=8)
+        axes[0].set(title="Score Distribution", xlabel="P(fake)"); axes[0].legend(fontsize=8)
 
-        # ROC
         fpr, tpr, _ = roc_curve(labels, preds)
         axes[1].plot(fpr, tpr, label=f"AUC={metrics['auroc']:.3f}")
         axes[1].plot([0, 1], [0, 1], "k--", linewidth=0.8)
-        axes[1].set(title="ROC Curve", xlabel="FPR", ylabel="TPR")
-        axes[1].legend(fontsize=8)
+        axes[1].set(title="ROC Curve", xlabel="FPR", ylabel="TPR"); axes[1].legend(fontsize=8)
 
-        # Precision-Recall
-        prec, rec, _ = precision_recall_curve(labels, preds)
-        axes[2].plot(rec, prec)
-        axes[2].set(title="Precision-Recall", xlabel="Recall", ylabel="Precision")
+        axes[2].plot(thresholds, f1s)
+        axes[2].axvline(best_t, color="yellow", linestyle="--", label=f"best={best_t:.2f}")
+        axes[2].set(title="F1 vs Threshold", xlabel="Threshold", ylabel="F1"); axes[2].legend(fontsize=8)
 
-        # F1 vs Threshold
-        axes[3].plot(thresholds, f1_scores)
-        axes[3].axvline(best_t, color="yellow", linestyle="--", label=f"best={best_t:.2f}")
-        axes[3].set(title="F1 vs Threshold", xlabel="Threshold", ylabel="F1")
+        f1_af, counts = self._f1_vs_af(all_preds, all_labels, all_afs, best_t)
+        valid = ~np.isnan(f1_af)
+        axes[3].plot(AF_PLOT_POINTS[valid], f1_af[valid], marker="o", linewidth=1.5, markersize=5)
+        axes[3].axvspan(*METRIC_RANGE, alpha=0.12, color="green", label=f"metric range {METRIC_RANGE}")
+        axes[3].set(title="F1 vs Attack Factor", xlabel="Attack Factor", ylabel="F1", xlim=(0.4, 2.1), ylim=(0, 1.05))
+        axes[3].grid(alpha=0.3)
         axes[3].legend(fontsize=8)
 
         fig.tight_layout()
         fig.savefig(self.output_dir / f"{self.filename}.png", dpi=150, bbox_inches="tight")
         plt.close(fig)
-
 
     def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         self._collect(pl_module, batch)

@@ -1,4 +1,5 @@
 import argparse
+import os
 import torch
 import lightning as L
 
@@ -14,8 +15,10 @@ from src.data import FakeprintDataset
 def parse_args():
     parser = argparse.ArgumentParser(description="Train RobustDetector")
 
-    parser.add_argument("--data_dir", type=str, default="data/train/noattack/", help="Directory containing training fakeprint data")
-    parser.add_argument("--ckpt_dir", type=str, default="checkpoints/noattack/", help="Directory to save model checkpoints")
+    parser.add_argument("--data_dir", type=str, default="data/", help="Directory containing training fakeprint data")
+    parser.add_argument("--music_generator", type=str, default="suno_v5", choices=["udio_v120", "suno_v3.5", "suno_v5"], help="Directory containing AI-generated fakeprint data")
+    parser.add_argument("--attack", type=bool, action=argparse.BooleanOptionalAction, default=False, help="Whether to train with attacked samples (resampling) for robustness")
+    parser.add_argument("--ckpt_dir", type=str, default="checkpoints/", help="Directory to save model checkpoints")
     parser.add_argument("--mode", type=str, default="stft", choices=["stft", "cqt"], help="Type of time-frequency transform to use")
 
     # Dataset
@@ -23,8 +26,8 @@ def parse_args():
 
     # Model
     parser.add_argument("--use_norm", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--use_bias", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--use_convolution", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--use_bias", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--use_convolution", action=argparse.BooleanOptionalAction, default=True)
 
     # Transform
     parser.add_argument("--n_fft", type=int, default=16384)
@@ -55,8 +58,13 @@ def parse_args():
 def train(args):
     L.seed_everything(args.seed)
 
+    
+    ai_dir = os.path.join(args.data_dir, args.music_generator, "train", "noattack" if not args.attack else "attack")
+    human_dir = os.path.join(args.data_dir, "human", "train", "noattack" if not args.attack else "attack")
+
     dataset = FakeprintDataset(
-        args.data_dir,
+        ai_dir=ai_dir,
+        human_dir=human_dir,
         mode=args.mode,
         freq_range=args.freq_range,
         n_fft=args.n_fft,
@@ -105,7 +113,7 @@ def train(args):
     filename += f"-lamb={args.lamb}" if args.use_convolution else ""
 
     checkpoint_cb = ModelCheckpoint(
-        dirpath=args.ckpt_dir,
+        dirpath=os.path.join(args.ckpt_dir, args.music_generator, "attack" if args.attack else "noattack"),
         filename=filename,
         monitor="val_f1",
         mode="max",

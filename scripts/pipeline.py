@@ -11,7 +11,8 @@ import numpy as np
 from nnAudio.features import STFT, CQT
 from tqdm import tqdm, trange
 
-from src.utils import load_audio, speed_up, get_spectrum, get_fakeprints
+from src.utils import load_audio, get_spectrum, get_fakeprints
+from src.data import resample, pitch_shift
 
 
 def parse_args():
@@ -20,7 +21,10 @@ def parse_args():
     parser.add_argument("--out_dir", type=str, required=True, help="Directory to save processed fakeprint shards")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size for processing files")
     parser.add_argument("--max_duration", type=float, default=30.0, help="Maximum duration (in seconds) to load from each audio file")
-    parser.add_argument("--speed_up", type=str, choices=["discrete", "continuous", "none"], default="none", help="Whether to apply random speed changes for data augmentation")
+    parser.add_argument("--process_cqt", action=argparse.BooleanOptionalAction, default=False, help="Whether to compute CQT features in addition to STFT")
+    parser.add_argument("--attack_fn", type=str, choices=["resample", "pitch_shift", "none"], default="none", help="Type of attack to apply for data augmentation")
+    parser.add_argument("--attack_mode", type=str, choices=["discrete", "continuous"], default="continuous", help="Whether to apply random speed changes for data augmentation")
+    parser.add_argument("--attack_range", type=float, nargs=2, default=[0.7, 1.4], metavar=("LOW", "HIGH"), help="Range of speed factors for augmentation")
     parser.add_argument("--shard_size", type=int, default=500, help="Number of files to process per shard")
     parser.add_argument("--shard_start", type=int, default=0, help="Shard index to start from (for resuming)")
     parser.add_argument("--num_shards", type=int, default=None, help="Total number of shards to process (for resuming)")
@@ -49,7 +53,9 @@ def preprocess_fakeprints(
     cqt_transform,
     batch_size=16,
     max_duration=60.0,
-    attack_mode=None,
+    attack_fn=None,
+    attack_mode="continuous",
+    attack_range=(0.7, 1.4),
     n_fft=16384,
     sampling_rate=44100,
     bins_per_octave=192,
@@ -60,11 +66,12 @@ def preprocess_fakeprints(
     hop_length = n_fft // 2
 
     stft_transform = stft_transform.to(device)
-    cqt_transform = cqt_transform.to(device)
+    if cqt_transform is not None:
+        cqt_transform = cqt_transform.to(device)
     
     stft_fakeprints = []
     cqt_fakeprints = []
-    speed_factors = []
+    attack_factors = []
 
     num_batches = (len(file_paths) + batch_size - 1) // batch_size
     for i in trange(num_batches, leave=False, desc="Extracting fakeprints"):
@@ -74,22 +81,24 @@ def preprocess_fakeprints(
 
         batch_waves = []
         for path in tqdm(batch_files, leave=False, desc=f"Loading audio files for batch {i+1}/{num_batches}"):
-            waveform, sr = load_audio(path, max_duration=max_duration)
+            waveform, sr = load_audio(path, max_duration=max_duration) # (channels, samples)
             if waveform is None:
                 continue
-            
-            if attack_mode == "discrete":
-                bin_shifts = np.arange(-40, 40)
-                discrete_sf = 2 ** (bin_shifts / bins_per_octave)
-                speed_factor = np.random.choice(discrete_sf) # Discrete speed factors for augmentation
-                waveform = speed_up(waveform, sr, speed_factor)
-                speed_factors.append(speed_factor)
-            elif attack_mode == "continuous":
-                speed_factor = np.random.uniform(0.8, 1.25) # Continuous speed factors for augmentation
-                waveform = speed_up(waveform, sr, speed_factor)
-                speed_factors.append(speed_factor)
+
+            if attack_fn is not None:
+                if attack_mode == "discrete":
+                    bin_low, bin_high = bins_per_octave * np.log2(attack_range[0]), bins_per_octave * np.log2(attack_range[1])
+                    bins_range = int(np.ceil(max(abs(bin_low), abs(bin_high))))
+                    bin_shifts = np.arange(-bins_range, bins_range + 1)
+                    discrete_sfs = 2 ** (bin_shifts / bins_per_octave)
+                    attack_factor = np.random.choice(discrete_sfs) # Discrete attack factors for augmentation
+                elif attack_mode == "continuous":
+                    attack_factor = np.random.uniform(attack_range[0], attack_range[1]) # Continuous attack factors for augmentation
+
+                waveform = attack_fn(waveform, sr, attack_factor)
+                attack_factors.append(attack_factor)
             else:
-                speed_factors.append(1.0)
+                attack_factors.append(1.0)
 
             if sr != sampling_rate:
                 waveform = soxr.resample(waveform.T, sr, sampling_rate, quality="VHQ").T
@@ -106,7 +115,6 @@ def preprocess_fakeprints(
         padded = padded.to(device) # (B, 1, Lmax)
 
         stft_batch = get_spectrum(stft_transform, padded) # (B, n_bins, T')
-        cqt_batch = get_spectrum(cqt_transform, padded) # (B, n_bins, T')
 
         T_frames = stft_batch.shape[-1]
         frame_lengths = ((lengths - n_fft) // hop_length + 1).unsqueeze(1) # (B, 1)
@@ -114,34 +122,43 @@ def preprocess_fakeprints(
 
         # Average over time dimension, accounting for varying lengths
         stft_batch = (stft_batch * mask.unsqueeze(1)).sum(-1) / frame_lengths.float() # (B, n_bins)
-        cqt_batch = (cqt_batch * mask.unsqueeze(1)).sum(-1) / frame_lengths.float() # (B, n_bins)
-
         stft_fp = get_fakeprints(stft_batch, area=hull_area)
-        cqt_fp = get_fakeprints(cqt_batch, area=hull_area)
-
         stft_fakeprints.append(stft_fp)
-        cqt_fakeprints.append(cqt_fp)
+
+        if cqt_transform is not None:
+            cqt_batch = get_spectrum(cqt_transform, padded) # (B, n_bins, T')
+            cqt_batch = (cqt_batch * mask.unsqueeze(1)).sum(-1) / frame_lengths.float() # (B, n_bins)
+            cqt_fp = get_fakeprints(cqt_batch, area=hull_area)
+            cqt_fakeprints.append(cqt_fp)
 
     stft_fakeprints = torch.cat(stft_fakeprints, dim=0)
-    cqt_fakeprints = torch.cat(cqt_fakeprints, dim=0)
-    speed_factors = np.array(speed_factors)
+    attack_factors = np.array(attack_factors)
 
-    return {
+    data = {
         "stft": stft_fakeprints.cpu().numpy(),
-        "cqt": cqt_fakeprints.cpu().numpy(),
-        "speed_factors": speed_factors,
+        "attack_factors": attack_factors,
         "n_fft": n_fft,
         "sampling_rate": sampling_rate,
         "bins_per_octave": bins_per_octave,
         "hull_area": hull_area,
     }
 
+    if cqt_transform is not None:
+        cqt_fakeprints = torch.cat(cqt_fakeprints, dim=0)
+        data["cqt"] = cqt_fakeprints.cpu().numpy()
+
+    return data
+
+
 def pipeline(
     data_dir,
     out_dir,
     batch_size=16,
     max_duration=60.0,
-    attack_mode=None,
+    process_cqt=False,
+    attack_fn=None,
+    attack_mode="continuous",
+    attack_range=(0.7, 1.4),
     shard_size=500,
     shard_start=0,
     num_shards=None,
@@ -171,15 +188,18 @@ def pipeline(
         verbose=False,
     )
 
-    cqt_transform = CQT(
-        sr=sampling_rate,
-        hop_length=hop_length,
-        fmin=fmin,
-        fmax=fmax,
-        bins_per_octave=bins_per_octave,
-        output_format="Magnitude",
-        verbose=False,
-    )
+    if process_cqt:
+        cqt_transform = CQT(
+            sr=sampling_rate,
+            hop_length=hop_length,
+            fmin=fmin,
+            fmax=fmax,
+            bins_per_octave=bins_per_octave,
+            output_format="Magnitude",
+            verbose=False,
+        )
+    else:
+        cqt_transform = None
 
     end = len(shards) if not num_shards else min(shard_start + num_shards, len(shards))
     for i in trange(shard_start, end):
@@ -190,7 +210,9 @@ def pipeline(
             cqt_transform=cqt_transform,
             batch_size=batch_size,
             max_duration=max_duration,
+            attack_fn=attack_fn,
             attack_mode=attack_mode,
+            attack_range=attack_range,
             n_fft=n_fft,
             sampling_rate=sampling_rate,
             bins_per_octave=bins_per_octave,
@@ -205,14 +227,18 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    attack_mode = args.speed_up if args.speed_up != "none" else None
+    assert args.attack_fn in ["resample", "pitch_shift", "none"], "Invalid attack function"
+    attack_fn = resample if args.attack_fn == "resample" else pitch_shift if args.attack_fn == "pitch_shift" else None
     
     pipeline(
         args.data_dir,
         args.out_dir,
         batch_size=args.batch_size,
         max_duration=args.max_duration,
-        attack_mode=attack_mode,
+        process_cqt=args.process_cqt,
+        attack_fn=attack_fn,
+        attack_mode=args.attack_mode,
+        attack_range=args.attack_range,
         shard_size=args.shard_size,
         shard_start=args.shard_start,
         num_shards=args.num_shards,

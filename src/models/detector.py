@@ -17,9 +17,9 @@ class RobustDetector(L.LightningModule):
         # Model params
         transform_type="stft",
         use_norm=True,
-        use_bias=False,
+        use_bias=True,
+        use_convolution=True,
         init_std=0.02,
-        use_convolution=False,
         # Transform params
         freq_range=[5000, 16000],
         n_fft=16384,  # 2**14
@@ -146,7 +146,8 @@ class RobustDetector(L.LightningModule):
         )  # (n_log_bins,)
 
         # Interpolate the fakeprints to the logarithmic frequency bins
-        freq_indices = (log_freqs - freqs_crop[0]) / (freqs_crop[1] - freqs_crop[0])
+        df = freqs_crop[1] - freqs_crop[0]
+        freq_indices = (log_freqs - freqs_crop[0]) / df  # (n_log_bins,)
         freq_indices = freq_indices.clamp(0, len(freqs_crop) - 1).to(fp.device)
         idx_low = freq_indices.long()
         idx_high = (idx_low + 1).clamp(max=len(freqs_crop) - 1)
@@ -170,7 +171,7 @@ class RobustDetector(L.LightningModule):
 
 
     def training_step(self, batch, batch_idx):
-        fp, label, su_factor = batch
+        fp, label, attack_factor = batch
 
         if self.transform_type == "stft" and self.log_stft:
             fp = self.stft_to_log(fp)
@@ -184,7 +185,7 @@ class RobustDetector(L.LightningModule):
 
         if self.use_convolution:
             mask = label == 1
-            bin_shift = torch.round(torch.log2(su_factor) * bins_per_octave)
+            bin_shift = torch.round(torch.log2(attack_factor) * bins_per_octave)
             lag_index = (fp.shape[-1] // 2) + bin_shift
             reg_loss = F.cross_entropy(cross_corr[mask], lag_index[mask].long())
             loss = class_loss + self.lamb * reg_loss
@@ -198,7 +199,7 @@ class RobustDetector(L.LightningModule):
 
 
     def validation_step(self, batch, batch_idx):
-        fp, label, su_factor = batch
+        fp, label, attack_factor = batch
         
         if self.transform_type == "stft" and self.log_stft:
             fp = self.stft_to_log(fp)
@@ -212,7 +213,7 @@ class RobustDetector(L.LightningModule):
 
         if self.use_convolution:
             mask = label == 1
-            bin_shift = torch.round(torch.log2(su_factor) * bins_per_octave)
+            bin_shift = torch.round(torch.log2(attack_factor) * bins_per_octave)
             lag_index = (fp.shape[-1] // 2) + bin_shift
             reg_loss = F.cross_entropy(cross_corr[mask], lag_index[mask].long())
             loss = class_loss + self.lamb * reg_loss
@@ -243,7 +244,7 @@ class RobustDetector(L.LightningModule):
  
 
     def test_step(self, batch, batch_idx):
-        fp, label, su_factor = batch
+        fp, label, attack_factor = batch
         if self.transform_type == "stft" and self.log_stft:
             fp = self.stft_to_log(fp)
 

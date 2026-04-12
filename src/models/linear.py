@@ -8,7 +8,7 @@ class LinearProj(nn.Module):
         self,
         feature_dim,
         use_norm=True,
-        use_bias=False,
+        use_bias=True,
         init_std=0.02,
     ):
         super(LinearProj, self).__init__()
