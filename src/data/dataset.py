@@ -48,7 +48,8 @@ class FakeprintDataset(Dataset):
                 attack_factors = data.get("attack_factors", [1.0])  # Optional attack factors for augmentation
 
                 for fp, attack_factor in zip(fakeprints, attack_factors):
-                    
+                    if np.isnan(fp).any() or np.isinf(fp).any():
+                        continue
                     self.samples.append((fp, label, attack_factor))
 
     def __len__(self):

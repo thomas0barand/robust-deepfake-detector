@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import lightning as L
-from sklearn.metrics import roc_auc_score, f1_score, precision_score, accuracy_score, recall_score, roc_curve
+from sklearn.metrics import roc_auc_score, f1_score, precision_score, accuracy_score, recall_score, roc_curve, confusion_matrix
 from pathlib import Path
 
 METRIC_RANGE = (0.7, 1.4)
@@ -59,7 +59,8 @@ class MetricsCallback(L.Callback):
         thresholds = np.linspace(0.01, 0.99, 199)
         f1s = [f1_score(labels, (preds >= t).astype(int), zero_division=0) for t in thresholds]
         best_t = thresholds[np.argmax(f1s)]
-        pred_bin = (preds >= best_t).astype(int)
+        pred_bin = (preds >= 0.5).astype(int)
+        tn, fp, fn, tp = confusion_matrix(labels, pred_bin).ravel()
 
         metrics = {
             "auroc":     roc_auc_score(labels, preds),
@@ -67,6 +68,7 @@ class MetricsCallback(L.Callback):
             "precision": precision_score(labels, pred_bin, zero_division=0),
             "accuracy":  accuracy_score(labels, pred_bin),
             "recall":    recall_score(labels, pred_bin, zero_division=0),
+            "fpr":       float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0,
             "threshold": best_t,
         }
 
@@ -85,7 +87,7 @@ class MetricsCallback(L.Callback):
 
         self._plot(preds, labels, metrics, best_t, f1s, thresholds, all_preds, all_labels, all_afs)
         print(
-            f"\n[TEST] af∈{METRIC_RANGE} ({mask.sum()}/{len(mask)}) | threshold={best_t:.3f} | "
+            f"\n[TEST] Attacks in range {METRIC_RANGE}: ({mask.sum()}/{len(mask)}) | threshold={best_t:.3f} | "
             + " | ".join(f"{k}={v:.4f}" for k, v in metrics.items() if k != "threshold")
             + f"\n[LATENCY] mean={latency_stats['latency_per_sample_mean_ms']:.1f}ms  "
             + f"throughput={latency_stats['throughput_samples_per_sec']:.1f} samples/s"

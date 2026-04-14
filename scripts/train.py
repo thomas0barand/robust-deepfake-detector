@@ -16,7 +16,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train RobustDetector")
 
     parser.add_argument("--data_dir", type=str, default="data/", help="Directory containing training fakeprint data")
-    parser.add_argument("--music_generator", type=str, default="suno_v5", choices=["udio_v120", "suno_v3.5", "suno_v5"], help="Directory containing AI-generated fakeprint data")
+    parser.add_argument("--music_generator", type=str, default="suno_v5", choices=["udio_v120", "suno_v3_5", "suno_v5"], help="Directory containing AI-generated fakeprint data")
     parser.add_argument("--attack", type=bool, action=argparse.BooleanOptionalAction, default=False, help="Whether to train with attacked samples (resampling) for robustness")
     parser.add_argument("--ckpt_dir", type=str, default="checkpoints/", help="Directory to save model checkpoints")
     parser.add_argument("--mode", type=str, default="stft", choices=["stft", "cqt"], help="Type of time-frequency transform to use")
@@ -27,7 +27,7 @@ def parse_args():
     # Model
     parser.add_argument("--use_norm", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--use_bias", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--use_convolution", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--use_convolution", action=argparse.BooleanOptionalAction, default=False)
 
     # Transform
     parser.add_argument("--n_fft", type=int, default=16384)
@@ -58,9 +58,10 @@ def parse_args():
 def train(args):
     L.seed_everything(args.seed)
 
-    
-    ai_dir = os.path.join(args.data_dir, args.music_generator, "train", "noattack" if not args.attack else "attack")
-    human_dir = os.path.join(args.data_dir, "human", "train", "noattack" if not args.attack else "attack")
+    attack_str = "attack" if args.attack else "noattack"
+    ai_dir = os.path.join(args.data_dir, args.music_generator, "train", attack_str)
+    human_subdir = "human_44100" if args.music_generator == "suno_v5" else "human_16000"
+    human_dir = os.path.join(args.data_dir, human_subdir, "train", attack_str)
 
     dataset = FakeprintDataset(
         ai_dir=ai_dir,

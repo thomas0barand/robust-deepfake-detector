@@ -122,7 +122,8 @@ class RobustDetector(L.LightningModule):
         Returns: (1, feature_dim)
         """
         waveform = waveform.mean(dim=0, keepdim=True)  # Convert to mono
-        spec = get_spectrum(self.transform, waveform) # (1, n_bins, T')
+        min_db = -50 if self.sampling_rate == 16000 else None  # Use a lower min_db for 16kHz audio to reduce noise floor issues
+        spec = get_spectrum(self.transform, waveform, min_db=min_db) # (1, n_bins, T')
         spec = spec.mean(dim=-1) # (1, n_bins)
         
         fp = get_fakeprints(spec, area=self.hull_area)
@@ -172,6 +173,9 @@ class RobustDetector(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         fp, label, attack_factor = batch
+        assert not torch.isnan(fp).any(),      f"NaN in fp at step {batch_idx}"
+        assert not torch.isnan(label).any(),   f"NaN in label"
+        assert not torch.isnan(attack_factor).any(), f"NaN in attack_factor"
 
         if self.transform_type == "stft" and self.log_stft:
             fp = self.stft_to_log(fp)

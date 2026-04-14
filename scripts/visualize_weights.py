@@ -27,6 +27,8 @@ def plot_weights(
     else:
         freqs = model.freqs[model.mask].cpu().numpy()
 
+    if len(weights) != len(freqs):
+        weights = weights[:len(freqs)]
     assert len(weights) == len(freqs), f"Shape mismatch: weights {weights.shape} vs freqs {freqs.shape}"
 
     plt.figure(figsize=(14, 6))

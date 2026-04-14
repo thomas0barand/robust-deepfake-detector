@@ -45,6 +45,14 @@ def is_valid_mp3(file_path):
     except Exception as e:
         print(f"Error opening {file_path}: {e}")
         return False
+    
+
+def get_sonics_file_paths(data_dir, music_generator, split):
+    assert music_generator in ["suno_v5", "suno_v3_5", "udio_v120"], "Unsupported music generator in Sonics dataset"
+    assert split in ["train", "test"], "Unsupported split in Sonics dataset"
+    with open(f"{data_dir}/{music_generator}_{split}.txt", "r") as f:
+        file_paths = f.read().splitlines()
+    return file_paths
 
 
 def preprocess_fakeprints(
@@ -64,6 +72,7 @@ def preprocess_fakeprints(
 ):
     
     hop_length = n_fft // 2
+    min_db = -50 if sampling_rate == 16000 else None  # Use a min_db clamp for 16kHz audio to reduce noise floor issues
 
     stft_transform = stft_transform.to(device)
     if cqt_transform is not None:
@@ -114,7 +123,7 @@ def preprocess_fakeprints(
             padded[k, :, :w.shape[-1]] = w
         padded = padded.to(device) # (B, 1, Lmax)
 
-        stft_batch = get_spectrum(stft_transform, padded) # (B, n_bins, T')
+        stft_batch = get_spectrum(stft_transform, padded, min_db=min_db) # (B, n_bins, T')
 
         T_frames = stft_batch.shape[-1]
         frame_lengths = ((lengths - n_fft) // hop_length + 1).unsqueeze(1) # (B, 1)
@@ -126,7 +135,7 @@ def preprocess_fakeprints(
         stft_fakeprints.append(stft_fp)
 
         if cqt_transform is not None:
-            cqt_batch = get_spectrum(cqt_transform, padded) # (B, n_bins, T')
+            cqt_batch = get_spectrum(cqt_transform, padded, min_db=min_db) # (B, n_bins, T')
             cqt_batch = (cqt_batch * mask.unsqueeze(1)).sum(-1) / frame_lengths.float() # (B, n_bins)
             cqt_fp = get_fakeprints(cqt_batch, area=hull_area)
             cqt_fakeprints.append(cqt_fp)
@@ -170,7 +179,11 @@ def pipeline(
     device=torch.device("cpu"),
 ):
     os.makedirs(out_dir, exist_ok=True)
-    file_paths = glob.glob(f"{data_dir}/**/*.mp3", recursive=True)
+    if "sonics" in data_dir.lower():
+        music_generator, split = out_dir.split("/")[1:3]
+        file_paths = get_sonics_file_paths(data_dir, music_generator, split)
+    else:
+        file_paths = glob.glob(f"{data_dir}/**/*.mp3", recursive=True)
     file_paths = sorted([p for p in file_paths if is_valid_mp3(p)])
     shards = [file_paths[i:i+shard_size] for i in range(0, len(file_paths), shard_size)]
     print(f"Total files: {len(file_paths)}, Shards: {len(shards)}")

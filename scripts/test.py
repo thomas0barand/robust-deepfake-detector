@@ -13,7 +13,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Test RobustDetector")
 
     parser.add_argument("--data_dir", type=str, default="data/", help="Directory containing test fakeprint data")
-    parser.add_argument("--music_generator", type=str, default="suno_v5", choices=["udio_v120", "suno_v3.5", "suno_v5"], help="Directory containing AI-generated fakeprint data")
+    parser.add_argument("--music_generator", type=str, default="suno_v5", choices=["udio_v120", "suno_v3_5", "suno_v5"], help="Directory containing AI-generated fakeprint data")
     parser.add_argument("--attack", type=str, choices=["resample", "pitch_shift", "noattack"], default="noattack", help="Whether to test on attacked samples (resampling, pitch_shift) for robustness")
     parser.add_argument("--out_dir", type=str, default="results/", help="Directory to save test results")
     parser.add_argument("--ckpt_path", type=str, required=True, help="Path to model checkpoint")
@@ -29,7 +29,8 @@ def test(args):
     model.eval()
 
     ai_dir = os.path.join(args.data_dir, args.music_generator, "test", args.attack)
-    human_dir = os.path.join(args.data_dir, "human", "test", args.attack)
+    human_subdir = "human_44100" if args.music_generator == "suno_v5" else "human_16000"
+    human_dir = os.path.join(args.data_dir, human_subdir, "test", args.attack)
     
     dataset = FakeprintDataset(
         ai_dir=ai_dir,

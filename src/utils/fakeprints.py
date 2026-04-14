@@ -12,15 +12,17 @@ def load_audio(file_path, max_duration=None):
         return None, None
 
 
-def get_spectrum(transform, waveform):
+def get_spectrum(transform, waveform, min_db=None):
     with torch.no_grad():
         spec = transform(waveform) # (B, 1, L) -> (B, n_bins, T')
+        spec_power = torch.clamp(torch.square(spec), min=1e-10, max=1e6)
 
-    spec = 10 * torch.log10(torch.clamp(spec, min=1e-10, max=1e6))
-    return spec
+    spec_db = 10 * torch.log10(spec_power)  # Convert to dB scale
+    spec_db = torch.clamp(spec_db, min=min_db)
+    return spec_db
 
 
-def get_freqs(n_fft, sr, log=True, bins_per_octave=192, fmin=32.7):
+def get_freqs(n_fft, sr, log=False, bins_per_octave=192, fmin=32.7):
     if log:
         nyquist = sr / 2
         n_octaves = np.log2(nyquist / fmin)

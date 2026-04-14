@@ -10,11 +10,13 @@ class LinearProj(nn.Module):
         use_norm=True,
         use_bias=True,
         init_std=0.02,
+        max_clamp=16,
     ):
         super(LinearProj, self).__init__()
 
         self.feature_dim = feature_dim
         self.use_norm = use_norm
+        self.max_clamp = max_clamp
         self.weights = nn.Parameter(torch.randn(1, feature_dim) * init_std)
         if use_bias:
             self.bias = nn.Parameter(torch.zeros(1))
@@ -23,7 +25,7 @@ class LinearProj(nn.Module):
 
     def forward(self, x, convolve=False):
         # Clamp features to prevent extreme values, then optionally normalize
-        x = F.normalize(torch.clamp(x, max=8), p=2, dim=-1) if self.use_norm else torch.clamp(x, max=8)
+        x = F.normalize(torch.clamp(x, max=self.max_clamp), p=2, dim=-1) if self.use_norm else torch.clamp(x, max=self.max_clamp)
 
         if convolve:
             x_conv = x.unsqueeze(1)  # (B, 1, F)

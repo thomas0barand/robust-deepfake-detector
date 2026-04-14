@@ -22,9 +22,9 @@ def plot_fp(freqs, fakeprints, log_scale=True):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", type=str, default="data/train/ai", help="Directory containing .npz files")
+    parser.add_argument("--data_dir", type=str, default="data/suno_v3_5/train/attack", help="Directory containing .npz files")
     parser.add_argument("--transform", type=str, choices=["stft", "cqt"], default="stft", help="Transform type to visualize")
-    parser.add_argument("--freq_range", nargs=2, type=int, default=[200, 16000], help="Frequency range to plot")
+    parser.add_argument("--freq_range", nargs=2, type=int, default=[1000, 7000], help="Frequency range to plot")
     parser.add_argument("--max_files", type=int, default=5, help="Maximum number of .npz files to show")
     args = parser.parse_args()
 
