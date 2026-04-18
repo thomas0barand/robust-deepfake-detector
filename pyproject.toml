@@ -27,6 +27,7 @@ dependencies = [
     "jupyter",
     "ipykernel",
     "lightning",
+    "pyrubberband",
 ]
 
 [project.optional-dependencies]
