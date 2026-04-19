@@ -2,7 +2,7 @@ import torch
 import soxr
 import numpy as np
 
-import src.utils.pyrubberband.pyrb as pyrb
+from src.utils.pitch_shift_ext import pitch_shift_2
 
 
 def pitch_shift(waveform, sr, pitch_factor):
@@ -15,7 +15,7 @@ def pitch_shift(waveform, sr, pitch_factor):
     audio_np = waveform.cpu().numpy()  # (channels, samples)
 
     shifted_channels = [
-        pyrb.pitch_shift_2(channel, sr, ratio=pitch_factor)
+        pitch_shift_2(channel, sr, ratio=pitch_factor)
         for channel in audio_np
     ]
 
