@@ -16,8 +16,6 @@ To ensure reproducibility, we kept the lockfile `requirements.lock` with all the
 ### Dev setup
 If you need to run the preprocessing pipeline for the pitch shift attack, you will need to install the following dependency:
 - rubberband [https://breakfastquay.com/rubberband/]: software library for audio time-stretching and pitch-shifting
-```
-
 
 ## Project structure
 
